@@ -19,10 +19,10 @@ class ConnectGRPCWebClient(BaseClient):
     async def call_client_streaming(self, url: str, reqs: StreamInput[Message], response_type: Type[T]) -> T:
         raise NotImplementedError
 
-    async def call_server_streaming(self, url: str, req: Message, response_type: Type[T]) -> AsyncIterator[T]:
+    def call_server_streaming(self, url: str, req: Message, response_type: Type[T]) -> AsyncIterator[T]:
         raise NotImplementedError
 
-    async def call_bidirectional_streaming(
+    def call_bidirectional_streaming(
         self, url: str, reqs: StreamInput[Message], response_type: Type[T]
     ) -> AsyncIterator[T]:
         raise NotImplementedError

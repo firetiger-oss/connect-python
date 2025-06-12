@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Type, TypeVar, AsyncIterator
+from typing import Type, TypeVar, AsyncIterator, Optional
 from collections.abc import Iterable
 
 import aiohttp
@@ -29,9 +29,13 @@ class ConnectClient:
 
     def __init__(
         self,
-        http_client: aiohttp.ClientSession,
+        http_client: Optional[aiohttp.ClientSession] = None,
         protocol: ConnectProtocol = ConnectProtocol.CONNECT_PROTOBUF,
     ):
+
+        if http_client is None:
+            http_client = aiohttp.ClientSession()
+        
         if protocol == ConnectProtocol.CONNECT_PROTOBUF:
             self._client = ConnectProtobufClient(http_client)
         elif protocol == ConnectProtocol.CONNECT_JSON:
@@ -61,11 +65,11 @@ class ConnectClient:
         async_iter = self._to_async_iterator(reqs)
         return await self._client.call_client_streaming(url, async_iter, response_type)
 
-    async def call_server_streaming(self, url: str, req: Message, response_type: Type[T]) -> AsyncIterator[T]:
-        return await self._client.call_server_streaming(url, req, response_type)
+    def call_server_streaming(self, url: str, req: Message, response_type: Type[T]) -> AsyncIterator[T]:
+        return self._client.call_server_streaming(url, req, response_type)
 
-    async def call_bidirectional_streaming(
+    def call_bidirectional_streaming(
         self, url: str, reqs: StreamInput[Message], response_type: Type[T]
     ) -> AsyncIterator[T]:
         async_iter = self._to_async_iterator(reqs)
-        return await self._client.call_bidirectional_streaming(url, async_iter, response_type)
+        return self._client.call_bidirectional_streaming(url, async_iter, response_type)
