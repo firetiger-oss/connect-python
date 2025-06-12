@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Type, TypeVar, AsyncIterator
+from collections.abc import Iterable
 
 import aiohttp
 from google.protobuf.message import Message
 
 from .client_base import BaseClient
+
+T = TypeVar('T', bound=Message)
 from .client_grpc import ConnectGRPCClient
 from .client_grpc_web import ConnectGRPCWebClient
 from .client_json import ConnectJSONClient
 from .client_protobuf import ConnectProtobufClient
-from .streams import ClientStream
-from .streams import ServerStream
+from .streams import StreamInput
 
 
 class ConnectProtocol(Enum):
@@ -36,18 +39,33 @@ class ConnectClient:
         elif protocol == ConnectProtocol.GRPC:
             self._client = ConnectGRPCClient(http_client)                        
         elif protocol == ConnectProtocol.GRPC_WEB:
-            self._client = ConnectGRPCWebClient(http_client)                                    
+            self._client = ConnectGRPCWebClient(http_client)
 
-    async def call_unary(self, url: str, req: Message) -> Message:
-        return await self._client.call_unary(url, req)
+    def _to_async_iterator(self, input_stream: StreamInput[T]) -> AsyncIterator[T]:
+        """Convert various input types to AsyncIterator"""
+        # Check for async iteration first
+        if hasattr(input_stream, '__aiter__'):
+            return input_stream  # type: ignore[return-value]
+        
+        # Fall back to sync iteration (covers lists, iterators, etc.)
+        async def _sync_to_async() -> AsyncIterator[T]:
+            for item in input_stream:
+                yield item
+        
+        return _sync_to_async()                                    
 
-    async def call_client_streaming(self, url: str, reqs: ClientStream) -> Message:
-        return await self._client.call_client_streaming(url, reqs)
+    async def call_unary(self, url: str, req: Message, response_type: Type[T]) -> T:
+        return await self._client.call_unary(url, req, response_type)
 
-    async def call_server_streaming(self, url: str, req: Message) -> ServerStream:
-        return await self._client.call_server_streaming(url, req)
+    async def call_client_streaming(self, url: str, reqs: StreamInput[Message], response_type: Type[T]) -> T:
+        async_iter = self._to_async_iterator(reqs)
+        return await self._client.call_client_streaming(url, async_iter, response_type)
+
+    async def call_server_streaming(self, url: str, req: Message, response_type: Type[T]) -> AsyncIterator[T]:
+        return await self._client.call_server_streaming(url, req, response_type)
 
     async def call_bidirectional_streaming(
-        self, url: str, reqs: ClientStream
-    ) -> ServerStream:
-        return await self._client.call_bidirectional_streaming(url, reqs)
+        self, url: str, reqs: StreamInput[Message], response_type: Type[T]
+    ) -> AsyncIterator[T]:
+        async_iter = self._to_async_iterator(reqs)
+        return await self._client.call_bidirectional_streaming(url, async_iter, response_type)

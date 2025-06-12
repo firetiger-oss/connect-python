@@ -1,16 +1,7 @@
-from typing import Generic
-from typing import TypeVar
+from typing import Generic, Type, TypeVar, Union, AsyncIterator
+from collections.abc import Iterable
 
-T = TypeVar("T")
+from google.protobuf.message import Message
 
-
-class ClientStream:
-    pass
-
-
-class ServerStream:
-    pass
-
-
-class Stream(Generic[T]):
-    pass
+T = TypeVar("T", bound=Message)
+StreamInput = Union[AsyncIterator[T], Iterable[T]]
