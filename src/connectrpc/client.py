@@ -61,14 +61,18 @@ class ConnectClient:
     async def call_unary(self, url: str, req: Message, response_type: type[T]) -> T:
         return await self._client.call_unary(url, req, response_type)
 
-    async def call_client_streaming(self, url: str, reqs: StreamInput[Message], response_type: type[T]) -> T:
+    async def call_client_streaming(
+        self, url: str, reqs: StreamInput[Message], response_type: type[T]
+    ) -> T:
         async_iter = self._to_async_iterator(reqs)
         stream_output = await self._client.call_streaming(url, async_iter, response_type)
         async for response in stream_output:
             return response
         raise RuntimeError("No response received from client streaming call")
 
-    async def call_server_streaming(self, url: str, req: Message, response_type: type[T]) -> StreamOutput[T]:
+    async def call_server_streaming(
+        self, url: str, req: Message, response_type: type[T]
+    ) -> StreamOutput[T]:
         async def single_req() -> AsyncIterator[Message]:
             yield req
 

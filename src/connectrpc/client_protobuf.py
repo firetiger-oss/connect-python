@@ -29,14 +29,18 @@ class ConnectProtobufClient(BaseClient):
                 raise await self.unary_error(resp)
 
             if resp.headers["Content-Type"] != "application/proto":
-                raise ConnectProtocolError(f"got unexpected Content-Type in response: {resp.headers['Content-Type']}")
+                raise ConnectProtocolError(
+                    f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
+                )
             body = await resp.read()
             response_msg = response_type()
             response_msg.ParseFromString(body)
 
             return response_msg
 
-    async def call_streaming(self, url: str, reqs: AsyncIterator[Message], response_type: type[T]) -> StreamOutput[T]:
+    async def call_streaming(
+        self, url: str, reqs: AsyncIterator[Message], response_type: type[T]
+    ) -> StreamOutput[T]:
         headers = {
             "Content-Type": "application/connect+proto",
             "Connect-Protocol-Version": "1",
@@ -58,7 +62,9 @@ class ConnectProtobufClient(BaseClient):
 
         if resp.headers["Content-Type"] != "application/connect+proto":
             await resp.release()
-            raise ConnectProtocolError(f"got unexpected Content-Type in response: {resp.headers['Content-Type']}")
+            raise ConnectProtocolError(
+                f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
+            )
         return ConnectProtobufStreamOutput(resp, response_type)
 
     async def unary_error(self, resp: aiohttp.ClientResponse) -> Exception:
