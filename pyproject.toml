@@ -105,5 +105,8 @@ asyncio_mode = "auto"
 
 [dependency-groups]
 dev = [
+    "just-bin>=1.40.0",
+    "python-lsp-server>=1.12.2",
+    "ruff-lsp>=0.0.62",
     "types-protobuf>=6.30.2.20250516",
 ]

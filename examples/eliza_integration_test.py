@@ -40,9 +40,17 @@ async def test_introduce(client: ElizaServiceClient, protocol_name: str) -> bool
     
     try:
         responses = []
-        async for response in client.introduce(request):
-            responses.append(response.sentence)
-            print(f"    Eliza: {response.sentence}")
+        async with await client.introduce(request) as stream:
+            async for response in stream:
+                responses.append(response.sentence)
+                print(f"    Eliza: {response.sentence}")
+        
+        # Test trailing metadata access
+        try:
+            trailing_metadata = stream.trailing_metadata()
+            print(f"    Trailing metadata: {trailing_metadata}")
+        except Exception as e:
+            print(f"    Trailing metadata access failed: {e}")
         
         if responses:
             print(f"    Received {len(responses)} introduction sentences")
@@ -74,9 +82,17 @@ async def test_converse(client: ElizaServiceClient, protocol_name: str) -> bool:
             requests.append(req)
         
         responses = []
-        async for response in client.converse(requests):
-            responses.append(response.sentence)
-            print(f"    Eliza: {response.sentence}")
+        async with await client.converse(requests) as stream:
+            async for response in stream:
+                responses.append(response.sentence)
+                print(f"    Eliza: {response.sentence}")
+        
+        # Test trailing metadata access
+        try:
+            trailing_metadata = stream.trailing_metadata()
+            print(f"    Trailing metadata: {trailing_metadata}")
+        except Exception as e:
+            print(f"    Trailing metadata access failed: {e}")
         
         if responses:
             print(f"    Had {len(responses)} exchanges in conversation")
