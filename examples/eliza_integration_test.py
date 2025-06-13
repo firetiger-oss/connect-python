@@ -52,6 +52,7 @@ async def test_introduce(client: ElizaServiceClient, protocol_name: str) -> bool
             return False
     except Exception as e:
         print(f"    ERROR: {e}")
+        raise
         return False
 
 
@@ -85,6 +86,7 @@ async def test_converse(client: ElizaServiceClient, protocol_name: str) -> bool:
             return False
     except Exception as e:
         print(f"    ERROR: {e}")
+        raise
         return False
 
 
