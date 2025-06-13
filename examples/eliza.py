@@ -1,6 +1,6 @@
 from typing import Protocol, Awaitable, Optional, AsyncIterator
 
-from connectrpc.streams import StreamInput
+from connectrpc.streams import StreamInput, StreamOutput
 from connectrpc.client import ConnectClient, ConnectProtocol
 import aiohttp
 
@@ -12,10 +12,10 @@ class ElizaService(Protocol):
     async def say(self, req: eliza_pb2.SayRequest) -> eliza_pb2.SayResponse:
         ...
 
-    def converse(self, reqs: StreamInput[eliza_pb2.ConverseRequest]) -> AsyncIterator[eliza_pb2.ConverseResponse]:
+    async def converse(self, reqs: StreamInput[eliza_pb2.ConverseRequest]) -> StreamOutput[eliza_pb2.ConverseResponse]:
         ...
 
-    def introduce(self, req: eliza_pb2.IntroduceRequest) -> AsyncIterator[eliza_pb2.IntroduceResponse]:
+    async def introduce(self, req: eliza_pb2.IntroduceRequest) -> StreamOutput[eliza_pb2.IntroduceResponse]:
         ...
 
 
@@ -28,13 +28,13 @@ class ElizaServiceClient(ElizaService):
         url = self.base_url + "/connectrpc.eliza.v1.ElizaService/Say"
         return await self._connect_client.call_unary(url, req, eliza_pb2.SayResponse)
 
-    def converse(self, reqs: StreamInput[eliza_pb2.ConverseRequest]) -> AsyncIterator[eliza_pb2.ConverseResponse]:
+    async def converse(self, reqs: StreamInput[eliza_pb2.ConverseRequest]) -> StreamOutput[eliza_pb2.ConverseResponse]:
         url = self.base_url + "/connectrpc.eliza.v1.ElizaService/Converse"
-        return self._connect_client.call_bidirectional_streaming(url, reqs, eliza_pb2.ConverseResponse)
+        return await self._connect_client.call_bidirectional_streaming(url, reqs, eliza_pb2.ConverseResponse)
 
-    def introduce(self, req: eliza_pb2.IntroduceRequest) -> AsyncIterator[eliza_pb2.IntroduceResponse]:
+    async def introduce(self, req: eliza_pb2.IntroduceRequest) -> StreamOutput[eliza_pb2.IntroduceResponse]:
         url = self.base_url + "/connectrpc.eliza.v1.ElizaService/Introduce"
-        return self._connect_client.call_server_streaming(url, req, eliza_pb2.IntroduceResponse)
+        return await self._connect_client.call_server_streaming(url, req, eliza_pb2.IntroduceResponse)
     
         
 

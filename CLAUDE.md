@@ -137,3 +137,6 @@ metadata = stream.trailing_metadata()  # Returns Optional[dict], raises if not c
 - `just format` - Format code with ruff
 - `just check` - Lint with ruff  
 - `just mypy` - Type checking
+
+## Python Command
+- Use `uv run python` instead of `python` or `python3`
