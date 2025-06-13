@@ -19,7 +19,7 @@ test:
 
 # Run integration test against demo.connectrpc.com
 integration-test:
-    cd examples && uv run python eliza_integration_test.py --protocols connect-proto
+    cd examples && uv run python eliza_integration_test.py --protocols connect-proto connect-json
 
 # Run integration test with all protocols
 integration-test-all:

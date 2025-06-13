@@ -154,7 +154,7 @@ async def main() -> None:
         "--protocols",
         nargs="+",
         choices=["connect-proto", "connect-json", "grpc", "grpc-web"],
-        default=["connect-proto"],
+        default=["connect-proto", "connect-json"],
         help="Protocols to test (default: connect-proto)",
     )
 
