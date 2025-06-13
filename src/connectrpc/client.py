@@ -8,11 +8,11 @@ import aiohttp
 from google.protobuf.message import Message
 
 from .client_base import BaseClient
-from .client_connect import ConnectJSONSerialization
-from .client_connect import ConnectProtobufSerialization
 from .client_connect import ConnectProtocolClient
 from .client_grpc import ConnectGRPCClient
 from .client_grpc_web import ConnectGRPCWebClient
+from .connect_serialization import CONNECT_JSON_SERIALIZATION
+from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .streams import StreamInput
 from .streams import StreamOutput
 
@@ -38,9 +38,9 @@ class ConnectClient:
             http_client = aiohttp.ClientSession()
 
         if protocol == ConnectProtocol.CONNECT_PROTOBUF:
-            self._client = ConnectProtocolClient(http_client, ConnectProtobufSerialization())
+            self._client = ConnectProtocolClient(http_client, CONNECT_PROTOBUF_SERIALIZATION)
         elif protocol == ConnectProtocol.CONNECT_JSON:
-            self._client = ConnectProtocolClient(http_client, ConnectJSONSerialization())
+            self._client = ConnectProtocolClient(http_client, CONNECT_JSON_SERIALIZATION)
         elif protocol == ConnectProtocol.GRPC:
             self._client = ConnectGRPCClient(http_client)
         elif protocol == ConnectProtocol.GRPC_WEB:

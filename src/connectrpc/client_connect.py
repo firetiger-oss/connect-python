@@ -6,11 +6,11 @@ from typing import Any
 from typing import TypeVar
 
 import aiohttp
-from google.protobuf.json_format import MessageToJson
-from google.protobuf.json_format import Parse
 from google.protobuf.message import Message
 
 from .client_base import BaseClient
+from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
+from .connect_serialization import ConnectSerialization
 from .errors import ConnectProtocolError
 from .streams import StreamOutput
 from .streams_connect import EndStreamResponse
@@ -18,54 +18,11 @@ from .streams_connect import EndStreamResponse
 T = TypeVar("T", bound=Message)
 
 
-class ConnectSerialization:
-    unary_content_type: str
-    streaming_content_type: str
-
-    @classmethod
-    def serialize(cls, msg: Message) -> bytes:
-        raise NotImplementedError
-
-    @classmethod
-    def deserialize(cls, data: bytes, typ: type[T]) -> T:
-        raise NotImplementedError
-
-
-class ConnectJSONSerialization(ConnectSerialization):
-    unary_content_type = "application/json"
-    streaming_content_type = "application/connect+json"
-
-    @classmethod
-    def serialize(cls, msg: Message) -> bytes:
-        return MessageToJson(msg).encode("utf8")
-
-    @classmethod
-    def deserialize(cls, data: bytes, typ: type[T]) -> T:
-        v = typ()
-        Parse(data, v)
-        return v
-
-
-class ConnectProtobufSerialization(ConnectSerialization):
-    unary_content_type = "application/proto"
-    streaming_content_type = "application/connect+proto"
-
-    @classmethod
-    def serialize(cls, msg: Message) -> bytes:
-        return msg.SerializeToString()
-
-    @classmethod
-    def deserialize(cls, data: bytes, typ: type[T]) -> T:
-        v = typ()
-        v.ParseFromString(data)
-        return v
-
-
 class ConnectProtocolClient(BaseClient):
     def __init__(
         self,
         http_client: aiohttp.ClientSession,
-        serialization: ConnectSerialization = ConnectProtobufSerialization(),
+        serialization: ConnectSerialization = CONNECT_PROTOBUF_SERIALIZATION,
     ):
         self._http_client = http_client
         self.serde = serialization
