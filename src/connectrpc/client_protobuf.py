@@ -24,25 +24,19 @@ class ConnectProtobufClient(BaseClient):
             "Content-Type": "application/proto",
             "Connect-Protocol-Version": "1",
         }
-        async with self._http_client.request(
-            "POST", url, data=data, headers=headers
-        ) as resp:
+        async with self._http_client.request("POST", url, data=data, headers=headers) as resp:
             if resp.status != 200:
                 raise await self.unary_error(resp)
 
             if resp.headers["Content-Type"] != "application/proto":
-                raise ConnectProtocolError(
-                    f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
-                )
+                raise ConnectProtocolError(f"got unexpected Content-Type in response: {resp.headers['Content-Type']}")
             body = await resp.read()
             response_msg = response_type()
             response_msg.ParseFromString(body)
 
             return response_msg
 
-    async def call_streaming(
-        self, url: str, reqs: AsyncIterator[Message], response_type: type[T]
-    ) -> StreamOutput[T]:
+    async def call_streaming(self, url: str, reqs: AsyncIterator[Message], response_type: type[T]) -> StreamOutput[T]:
         headers = {
             "Content-Type": "application/connect+proto",
             "Connect-Protocol-Version": "1",
@@ -56,9 +50,7 @@ class ConnectProtobufClient(BaseClient):
 
         payload = aiohttp.AsyncIterablePayload(encoded_stream())
 
-        resp = await self._http_client.request(
-            "POST", url, data=payload, headers=headers
-        )
+        resp = await self._http_client.request("POST", url, data=payload, headers=headers)
         if resp.status != 200:
             # TODO: this needs more detail
             await resp.release()
@@ -66,9 +58,7 @@ class ConnectProtobufClient(BaseClient):
 
         if resp.headers["Content-Type"] != "application/connect+proto":
             await resp.release()
-            raise ConnectProtocolError(
-                f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
-            )
+            raise ConnectProtocolError(f"got unexpected Content-Type in response: {resp.headers['Content-Type']}")
         return ConnectProtobufStreamOutput(resp, response_type)
 
     async def unary_error(self, resp: aiohttp.ClientResponse) -> Exception:
@@ -129,9 +119,7 @@ class ConnectProtobufStreamOutput(StreamOutput[T]):
 
     def trailing_metadata(self) -> dict[str, Any] | None:
         if not self._consumed:
-            raise RuntimeError(
-                "Stream must be fully consumed before accessing trailing metadata"
-            )
+            raise RuntimeError("Stream must be fully consumed before accessing trailing metadata")
         return self._trailing_metadata
 
     async def __aenter__(self) -> "ConnectProtobufStreamOutput[T]":

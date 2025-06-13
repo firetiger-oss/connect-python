@@ -149,9 +149,7 @@ async def main() -> None:
     # Parse command line arguments for protocols
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Test Eliza service with different protocols"
-    )
+    parser = argparse.ArgumentParser(description="Test Eliza service with different protocols")
     parser.add_argument(
         "--protocols",
         nargs="+",

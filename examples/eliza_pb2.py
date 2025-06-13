@@ -10,9 +10,7 @@ from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 
-_runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC, 6, 30, 2, "", "eliza.proto"
-)
+_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 6, 30, 2, "", "eliza.proto")
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -28,9 +26,7 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "eliza_pb2", _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
     DESCRIPTOR._loaded_options = None
     _globals["_ELIZASERVICE"].methods_by_name["Say"]._loaded_options = None
-    _globals["_ELIZASERVICE"].methods_by_name[
-        "Say"
-    ]._serialized_options = b"\220\002\001"
+    _globals["_ELIZASERVICE"].methods_by_name["Say"]._serialized_options = b"\220\002\001"
     _globals["_SAYREQUEST"]._serialized_start = 36
     _globals["_SAYREQUEST"]._serialized_end = 66
     _globals["_SAYRESPONSE"]._serialized_start = 68
