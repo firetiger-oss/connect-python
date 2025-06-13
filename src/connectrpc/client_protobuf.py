@@ -9,7 +9,7 @@ from .errors import ConnectProtocolError
 from .client_base import BaseClient
 from .streams import StreamInput, EndStreamResponse
 
-T = TypeVar('T', bound=Message)
+T = TypeVar("T", bound=Message)
 
 
 class ConnectProtobufClient(BaseClient):
@@ -22,19 +22,30 @@ class ConnectProtobufClient(BaseClient):
             "Content-Type": "application/proto",
             "Connect-Protocol-Version": "1",
         }
-        async with self._http_client.request("POST", url, data=data, headers=headers) as resp:
+        async with self._http_client.request(
+            "POST", url, data=data, headers=headers
+        ) as resp:
             if resp.status != 200:
                 raise await self.unary_error(resp)
 
             if resp.headers["Content-Type"] != "application/proto":
-                raise ConnectProtocolError(f"got unexpected Content-Type in response: {resp.headers['Content-Type']}")
+                raise ConnectProtocolError(
+                    f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
+                )
             body = await resp.read()
             response_msg = response_type()
             response_msg.ParseFromString(body)
 
             return response_msg
 
-    async def call_streaming(self, url: str, reqs: StreamInput[Message], response_type: Type[T]) -> AsyncIterator[T]:
+    def call_streaming(
+        self, url: str, reqs: StreamInput[Message], response_type: Type[T]
+    ) -> AsyncIterator[T]:
+        return self._call_streaming_impl(url, reqs, response_type)
+
+    async def _call_streaming_impl(
+        self, url: str, reqs: StreamInput[Message], response_type: Type[T]
+    ) -> AsyncIterator[T]:
         headers = {
             "Content-Type": "application/connect+proto",
             "Connect-Protocol-Version": "1",
@@ -46,16 +57,19 @@ class ConnectProtobufClient(BaseClient):
                 envelope = struct.pack(">BI", 0, len(encoded))
                 yield envelope + encoded
 
-
         payload = aiohttp.AsyncIterablePayload(encoded_stream())
-        
-        async with self._http_client.request("POST", url, data=payload, headers=headers) as resp:
+
+        async with self._http_client.request(
+            "POST", url, data=payload, headers=headers
+        ) as resp:
             if resp.status != 200:
                 # TODO: this needs more detail
                 raise ConnectProtocolError(f"got non-200 response code to stream")
-            
+
             if resp.headers["Content-Type"] != "application/connect+proto":
-                raise ConnectProtocolError(f"got unexpected Content-Type in response: {resp.headers['Content-Type']}")
+                raise ConnectProtocolError(
+                    f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
+                )
             while True:
                 envelope = await resp.content.readexactly(5)
                 if envelope[0] & 1:
@@ -68,32 +82,12 @@ class ConnectProtobufClient(BaseClient):
                     if end_stream_response.error is not None:
                         raise ValueError(end_stream_response.error)
                     return
-                    
+
                 length = struct.unpack(">I", envelope[1:5])[0]
                 encoded = await resp.content.readexactly(length)
                 msg = response_type()
                 msg.ParseFromString(encoded)
                 yield msg
-        
-    async def call_client_streaming(self, url: str, reqs: StreamInput[Message], response_type: Type[T]) -> T:
-        # Send a stream, read a single message back.
-        async for response_msg in self.call_streaming(url, reqs, response_type):
-            return response_msg
-
-    async def call_server_streaming(self, url: str, req: Message, response_type: Type[T]) -> AsyncIterator[T]:
-        # Send a stream, read a single message back.
-        async def reqs() -> AsyncIterator[Message]:
-            yield req
-        
-        async for response_msg in self.call_streaming(url, reqs(), response_type):
-            yield response_msg
-
-    async def call_bidirectional_streaming(
-        self, url: str, reqs: StreamInput[Message], response_type: Type[T]
-    ) -> AsyncIterator[T]:
-        # Send a stream, read a single message back.
-        async for response_msg in self.call_streaming(url, reqs, response_type):
-            yield response_msg
 
     async def unary_error(self, resp: aiohttp.ClientResponse) -> Exception:
         txt = await resp.text()

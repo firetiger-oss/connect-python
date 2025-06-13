@@ -42,9 +42,26 @@ response = await client.call_client_streaming(url, [req1, req2], ResponseType)
 response = await client.call_client_streaming(url, generator(), ResponseType)
 ```
 
+### Simplified Protocol Interface (Dec 2024)
+**Key Insight**: Protocol implementations only need `call_streaming` + `call_unary`. All streaming variants are just different ways to call these primitives.
+
+**Architecture Decision**: 
+- `BaseClient` protocol: Only `call_unary()` and `call_streaming()` 
+- `ConnectClient`: Implements streaming variants by calling protocol methods:
+  - `call_client_streaming()` → `call_streaming()` + return first response
+  - `call_server_streaming()` → wrap single request + `call_streaming()`  
+  - `call_bidirectional_streaming()` → direct `call_streaming()`
+
+**Benefits**:
+- Simpler protocol implementations (less duplication)
+- Consistent streaming variant logic across all protocols
+- Protocol authors focus on core streaming mechanics
+
 ### Implementation Status
 - Integration test framework: ✅ Complete
 - Type system: ✅ Fixed
-- Protocol clients: ❌ Stubs (`NotImplementedError`)
+- Protocol interface: ✅ Simplified (2 methods vs 4)
+- ConnectProtobuf client: ✅ Complete
+- Other protocol clients: ❌ Stubs (`NotImplementedError`)
 
-**Next**: Implement actual protocol clients (ConnectProtobuf, ConnectJSON, gRPC, gRPC-Web)
+**Next**: Implement actual protocol clients (ConnectJSON, gRPC, gRPC-Web)

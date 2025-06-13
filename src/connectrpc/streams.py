@@ -28,6 +28,7 @@ class StreamingError:
             details=details,
         )
 
+
 @dataclass
 class StreamingErrorDetail:
     type: str
@@ -42,7 +43,7 @@ class StreamingErrorDetail:
             debug=data.get("debug"),
         )
 
-    
+
 @dataclass
 class EndStreamResponse:
     error: Optional[StreamingError]
@@ -58,5 +59,5 @@ class EndStreamResponse:
 
         if "metadata" in data_dict:
             val.metadata = data_dict["metadata"]
-            
+
         return val

@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from .client_base import BaseClient
 from .streams import StreamInput
 
-T = TypeVar('T', bound=Message)
+T = TypeVar("T", bound=Message)
 
 
 class ConnectGRPCClient(BaseClient):
@@ -16,13 +16,7 @@ class ConnectGRPCClient(BaseClient):
     async def call_unary(self, url: str, req: Message, response_type: Type[T]) -> T:
         raise NotImplementedError
 
-    async def call_client_streaming(self, url: str, reqs: StreamInput[Message], response_type: Type[T]) -> T:
-        raise NotImplementedError
-
-    def call_server_streaming(self, url: str, req: Message, response_type: Type[T]) -> AsyncIterator[T]:
-        raise NotImplementedError
-
-    def call_bidirectional_streaming(
+    def call_streaming(
         self, url: str, reqs: StreamInput[Message], response_type: Type[T]
     ) -> AsyncIterator[T]:
         raise NotImplementedError
