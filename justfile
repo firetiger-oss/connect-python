@@ -1,17 +1,17 @@
 # Run mypy type checking
 mypy:
-    mypy src tests
+    mypy src tests examples
 
 # Format code with ruff
 format:
-    ruff format src tests
+    ruff format src tests examples
 
 # Check code with ruff linter
 check:
-    ruff check src tests
+    ruff check src tests examples
 
 fix:
-    ruff check src tests --fix
+    ruff check src tests examples --fix
 
 # Run tests
 test:
