@@ -10,6 +10,7 @@ format:
 check:
     ruff check src tests examples
 
+# Fix auto-fixable ruff linter issues
 fix:
     ruff check src tests examples --fix
 
@@ -21,9 +22,5 @@ test:
 integration-test:
     cd examples && uv run python eliza_integration_test.py --protocols connect-proto connect-json
 
-# Run integration test with all protocols
-integration-test-all:
-    cd examples && uv run python eliza_integration_test.py --protocols connect-proto connect-json grpc grpc-web
-
-# Run all checks (format, check, mypy)
+# Run all checks (format, check, mypy, test, integration-test)
 all: format check mypy test integration-test
