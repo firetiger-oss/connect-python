@@ -22,5 +22,9 @@ test:
 integration-test:
     cd examples && uv run python eliza_integration_test.py --protocols connect-proto connect-json
 
+# Run protoc with connect_python plugin (development mode). usage: just protoc-gen [PROTOC_ARGS...]
+protoc-gen *ARGS:
+    protoc --plugin=protoc-gen-connect_python=.venv/bin/protoc-gen-connect_python {{ARGS}}
+
 # Run all checks (format, check, mypy, test, integration-test)
 all: format check mypy test integration-test

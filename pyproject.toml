@@ -42,6 +42,9 @@ dev = [
     "ruff>=0.1.0",
 ]
 
+[project.scripts]
+protoc-gen-connect_python = "connectrpc.protoc_gen_connect_python.main:main"
+
 [project.urls]
 Homepage = "https://github.com/firetiger-oss/connect-python"
 Repository = "https://github.com/firetiger-oss/connect-python"
