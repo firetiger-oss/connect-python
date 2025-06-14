@@ -1,13 +1,29 @@
+# Connect Python
+
+A Python implementation of the Connect RPC framework.
+
+## Installation
+
+For basic client functionality:
+```bash
+pip install connect-python
+```
+
+For code generation (protoc plugin):
+```bash
+pip install connect-python[compiler]
+```
+
 ### Development
 
 Set up development dependencies:
 ```sh
-uv sync --extra dev
+uv sync --extra dev --extra compiler
 ```
 
 Install the package in editable mode to produce a local `protoc-gen-connect_python` plugin for use with `protoc`:
 ```sh
-uv pip install -e .
+uv pip install -e .[compiler]
 ```
 
 Then, use `uv run just` to do development checks:

@@ -35,6 +35,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+compiler = [
+    # Add any compiler-specific dependencies here
+    "protogen>=0.3.1",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",

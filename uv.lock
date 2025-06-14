@@ -159,6 +159,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+compiler = [
+    { name = "protogen" },
+]
 dev = [
     { name = "mypy" },
     { name = "pytest" },
@@ -179,11 +182,12 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.12" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "protobuf", specifier = ">=6.31.1" },
+    { name = "protogen", marker = "extra == 'compiler'", specifier = ">=0.3.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["compiler", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -660,6 +664,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/76/a1/7a5a94032c83375e4fe7e7f56e3976ea6ac90c5e85fac8576409e25c39c3/protobuf-6.31.1-cp39-abi3-manylinux2014_aarch64.whl", hash = "sha256:a40fc12b84c154884d7d4c4ebd675d5b3b5283e155f324049ae396b95ddebc39", size = 322115, upload-time = "2025-05-28T19:25:47.128Z" },
     { url = "https://files.pythonhosted.org/packages/fa/b1/b59d405d64d31999244643d88c45c8241c58f17cc887e73bcb90602327f8/protobuf-6.31.1-cp39-abi3-manylinux2014_x86_64.whl", hash = "sha256:4ee898bf66f7a8b0bd21bce523814e6fbd8c6add948045ce958b73af7e8878c6", size = 321070, upload-time = "2025-05-28T19:25:50.036Z" },
     { url = "https://files.pythonhosted.org/packages/f7/af/ab3c51ab7507a7325e98ffe691d9495ee3d3aa5f589afad65ec920d39821/protobuf-6.31.1-py3-none-any.whl", hash = "sha256:720a6c7e6b77288b85063569baae8536671b39f15cc22037ec7045658d80489e", size = 168724, upload-time = "2025-05-28T19:25:53.926Z" },
+]
+
+[[package]]
+name = "protogen"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/24/fc/2e68784a06e46fe799dd375b732c13f99559a2c3b2164100607ec8b5cccf/protogen-0.3.1.tar.gz", hash = "sha256:1e55405f6c94476c45c400b069dbdb0274f065e3109fee28122e96dbba075dcd", size = 23018, upload-time = "2023-11-20T15:34:48.288Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/a0/c3f3a2e2fa866547d82190ec5c0cd55580bc29c7894221bd793003a578a1/protogen-0.3.1-py3-none-any.whl", hash = "sha256:65b60b284d20ee4899d515b1959882d8c7504b271552de36f4ebfe77f6b07331", size = 21425, upload-time = "2023-11-20T15:34:45.958Z" },
 ]
 
 [[package]]
