@@ -36,7 +36,6 @@ dependencies = [
 
 [project.optional-dependencies]
 compiler = [
-    # Add any compiler-specific dependencies here
     "protogen>=0.3.1",
 ]
 dev = [
@@ -67,6 +66,14 @@ warn_unreachable = true
 warn_unused_ignores = true
 show_error_codes = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[[tool.mypy.overrides]]
+module = "connectrpc.generator.generator"
+strict = false
+check_untyped_defs = false
+disallow_untyped_calls = false
+warn_return_any = false
+disable_error_code = ["union-attr"]
 
 [tool.ruff]
 target-version = "py310"

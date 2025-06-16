@@ -1,7 +1,7 @@
-from collections.abc import AsyncIterator
+# Generated Connect client code
 
+from collections.abc import AsyncIterator
 import aiohttp
-import eliza_pb2  # type: ignore[import-not-found]
 
 from connectrpc.client import ConnectClient
 from connectrpc.client import ConnectProtocol
@@ -19,46 +19,47 @@ class ElizaServiceClient:
         self.base_url = base_url
         self._connect_client = ConnectClient(http_client, protocol)
 
-    async def say(self, req: eliza_pb2.SayRequest) -> eliza_pb2.SayResponse:
+    async def say(self, req: SayRequest) -> SayResponse:
         url = self.base_url + "/connectrpc.eliza.v1.ElizaService/Say"
-        return await self._connect_client.call_unary(url, req, eliza_pb2.SayResponse)
+        return await self._connect_client.call_unary(url, req, SayResponse)
 
     def converse(
-        self, reqs: StreamInput[eliza_pb2.ConverseRequest]
-    ) -> AsyncIterator[eliza_pb2.ConverseResponse]:
+        self, reqs: StreamInput[ConverseRequest]
+    ) -> AsyncIterator[ConverseResponse]:
         return self._converse_impl(reqs)
 
     async def _converse_impl(
-        self, reqs: StreamInput[eliza_pb2.ConverseRequest]
-    ) -> AsyncIterator[eliza_pb2.ConverseResponse]:
+        self, reqs: StreamInput[ConverseRequest]
+    ) -> AsyncIterator[ConverseResponse]:
         async with await self.converse_stream(reqs) as stream:
             async for response in stream:
                 yield response
 
     async def converse_stream(
-        self, reqs: StreamInput[eliza_pb2.ConverseRequest]
-    ) -> StreamOutput[eliza_pb2.ConverseResponse]:
+        self, reqs: StreamInput[ConverseRequest]
+    ) -> StreamOutput[ConverseResponse]:
         url = self.base_url + "/connectrpc.eliza.v1.ElizaService/Converse"
         return await self._connect_client.call_bidirectional_streaming(
-            url, reqs, eliza_pb2.ConverseResponse
+            url, reqs, ConverseResponse
         )
 
     def introduce(
-        self, req: eliza_pb2.IntroduceRequest
-    ) -> AsyncIterator[eliza_pb2.IntroduceResponse]:
+        self, req: IntroduceRequest
+    ) -> AsyncIterator[IntroduceResponse]:
         return self._introduce_impl(req)
 
     async def _introduce_impl(
-        self, req: eliza_pb2.IntroduceRequest
-    ) -> AsyncIterator[eliza_pb2.IntroduceResponse]:
+        self, req: IntroduceRequest
+    ) -> AsyncIterator[IntroduceResponse]:
         async with await self.introduce_stream(req) as stream:
             async for response in stream:
                 yield response
 
     async def introduce_stream(
-        self, req: eliza_pb2.IntroduceRequest
-    ) -> StreamOutput[eliza_pb2.IntroduceResponse]:
+        self, req: IntroduceRequest
+    ) -> StreamOutput[IntroduceResponse]:
         url = self.base_url + "/connectrpc.eliza.v1.ElizaService/Introduce"
         return await self._connect_client.call_server_streaming(
-            url, req, eliza_pb2.IntroduceResponse
+            url, req, IntroduceResponse
         )
+
