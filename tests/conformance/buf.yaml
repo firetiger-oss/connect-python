@@ -1,0 +1,4 @@
+version: v2
+modules:
+  - path: vendor/conformance/proto
+    name: buf.build/connectrpc/conformance

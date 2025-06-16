@@ -26,5 +26,22 @@ integration-test:
 protoc-gen *ARGS:
     protoc --plugin=protoc-gen-connect_python=.venv/bin/protoc-gen-connect_python {{ARGS}}
 
+# Run conformance tests (requires connectconformance binary)
+conformance-test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v connectconformance &> /dev/null; then
+        echo "Error: connectconformance binary not found in PATH"
+        echo "Please install it with: go install connectrpc.com/conformance/cmd/connectconformance@latest"
+        echo "Or download from: https://github.com/connectrpc/conformance/releases"
+        exit 1
+    fi
+    cd tests/conformance
+    connectconformance \
+        --conf ./config.yaml \
+        --mode client \
+        -- \
+        uv run python conformance_client.py
+
 # Run all checks (format, check, mypy, test, integration-test)
 all: format check mypy test integration-test

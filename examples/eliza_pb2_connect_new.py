@@ -2,13 +2,13 @@
 
 from collections.abc import AsyncIterator
 
-import aiohttp
-from eliza_pb2 import ConverseRequest
-from eliza_pb2 import ConverseResponse
-from eliza_pb2 import IntroduceRequest
-from eliza_pb2 import IntroduceResponse
-from eliza_pb2 import SayRequest
-from eliza_pb2 import SayResponse
+from aiohttp import aiohttp
+from connectrpc_eliza_v1_pb2 import ConverseRequest
+from connectrpc_eliza_v1_pb2 import ConverseResponse
+from connectrpc_eliza_v1_pb2 import IntroduceRequest
+from connectrpc_eliza_v1_pb2 import IntroduceResponse
+from connectrpc_eliza_v1_pb2 import SayRequest
+from connectrpc_eliza_v1_pb2 import SayResponse
 
 from connectrpc.client import ConnectClient
 from connectrpc.client import ConnectProtocol

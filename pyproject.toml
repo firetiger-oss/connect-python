@@ -54,7 +54,7 @@ Repository = "https://github.com/firetiger-oss/connect-python"
 Issues = "https://github.com/firetiger-oss/connect-python/issues"
 
 [tool.hatch.version]
-path = "src/connectrpc/__init__.py"
+path = "src/connectrpc/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/connectrpc"]
@@ -117,8 +117,13 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 
+[[tool.uv.index]]
+url = "https://buf.build/gen/python"
+
 [dependency-groups]
 dev = [
+    "connectrpc-conformance-protocolbuffers-pyi>=31.1.0.1.20241008212309",
+    "connectrpc-conformance-protocolbuffers-python>=31.1.0.1.20241008212309",
     "just-bin>=1.40.0",
     "python-lsp-server>=1.12.2",
     "ruff-lsp>=0.0.62",

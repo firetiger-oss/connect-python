@@ -1,9 +1,7 @@
 import sys
 
 try:
-    import protogen
-
-    from connectrpc.generator.generator import generate
+    from connectrpc.generator.generator import invoke
 except ImportError as e:
     print(
         "Error: Missing compiler dependencies. Install with: pip install connect-python[compiler]",
@@ -12,16 +10,9 @@ except ImportError as e:
     print(f"Import error: {e}", file=sys.stderr)
     sys.exit(1)
 
-from google.protobuf.compiler import plugin_pb2
-
 
 def main() -> None:
-    opts = protogen.Options(
-        supported_features=[
-            plugin_pb2.CodeGeneratorResponse.Feature.FEATURE_PROTO3_OPTIONAL,
-        ]
-    )
-    opts.run(generate)
+    invoke(sys.stdin.buffer, sys.stdout.buffer)
 
 
 if __name__ == "__main__":

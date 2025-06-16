@@ -171,6 +171,8 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "connectrpc-conformance-protocolbuffers-pyi" },
+    { name = "connectrpc-conformance-protocolbuffers-python" },
     { name = "just-bin" },
     { name = "python-lsp-server" },
     { name = "ruff-lsp" },
@@ -191,10 +193,36 @@ provides-extras = ["compiler", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "connectrpc-conformance-protocolbuffers-pyi", specifier = ">=31.1.0.1.20241008212309" },
+    { name = "connectrpc-conformance-protocolbuffers-python", specifier = ">=31.1.0.1.20241008212309" },
     { name = "just-bin", specifier = ">=1.40.0" },
     { name = "python-lsp-server", specifier = ">=1.12.2" },
     { name = "ruff-lsp", specifier = ">=0.0.62" },
     { name = "types-protobuf", specifier = ">=6.30.2.20250516" },
+]
+
+[[package]]
+name = "connectrpc-conformance-protocolbuffers-pyi"
+version = "31.1.0.1.20241008212309+5939a22621c8"
+source = { registry = "https://buf.build/gen/python" }
+dependencies = [
+    { name = "protobuf" },
+    { name = "types-protobuf" },
+]
+wheels = [
+    { url = "https://buf.build/gen/python/connectrpc-conformance-protocolbuffers-pyi/connectrpc_conformance_protocolbuffers_pyi-31.1.0.1.20241008212309+5939a22621c8-py3-none-any.whl" },
+]
+
+[[package]]
+name = "connectrpc-conformance-protocolbuffers-python"
+version = "31.1.0.1.20241008212309+5939a22621c8"
+source = { registry = "https://buf.build/gen/python" }
+dependencies = [
+    { name = "connectrpc-conformance-protocolbuffers-pyi" },
+    { name = "protobuf" },
+]
+wheels = [
+    { url = "https://buf.build/gen/python/connectrpc-conformance-protocolbuffers-python/connectrpc_conformance_protocolbuffers_python-31.1.0.1.20241008212309+5939a22621c8-py3-none-any.whl" },
 ]
 
 [[package]]
