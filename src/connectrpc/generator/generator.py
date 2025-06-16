@@ -1,7 +1,9 @@
 import protogen
 
 
-def _generate_unary_rpc(g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method) -> None:
+def _generate_unary_rpc(
+    g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method
+) -> None:
     """Generate a unary RPC method."""
     g.P("async def ", m.py_name, "(self, req: ", m.input.py_ident, ") -> ", m.output.py_ident, ":")
     g.set_indent(8)
@@ -11,7 +13,9 @@ def _generate_unary_rpc(g: protogen.GeneratedFile, f: protogen.File, s: protogen
     g.P()
 
 
-def _generate_server_streaming_rpc(g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method) -> None:
+def _generate_server_streaming_rpc(
+    g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method
+) -> None:
     """Generate a server streaming RPC with dual API pattern."""
     # Simple iterator method
     g.P("def ", m.py_name, "(")
@@ -19,7 +23,7 @@ def _generate_server_streaming_rpc(g: protogen.GeneratedFile, f: protogen.File, 
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
     g.P("    return self._", m.py_name, "_impl(req)")
     g.P()
-    
+
     # Implementation helper
     g.P("async def _", m.py_name, "_impl(")
     g.P("    self, req: ", m.input.py_ident)
@@ -32,7 +36,7 @@ def _generate_server_streaming_rpc(g: protogen.GeneratedFile, f: protogen.File, 
     g.P("yield response")
     g.set_indent(4)
     g.P()
-    
+
     # Stream method for metadata access
     g.P("async def ", m.py_name, "_stream(")
     g.P("    self, req: ", m.input.py_ident)
@@ -46,7 +50,9 @@ def _generate_server_streaming_rpc(g: protogen.GeneratedFile, f: protogen.File, 
     g.P()
 
 
-def _generate_client_streaming_rpc(g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method) -> None:
+def _generate_client_streaming_rpc(
+    g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method
+) -> None:
     """Generate a client streaming RPC method."""
     g.P("async def ", m.py_name, "(")
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "]")
@@ -60,7 +66,9 @@ def _generate_client_streaming_rpc(g: protogen.GeneratedFile, f: protogen.File, 
     g.P()
 
 
-def _generate_bidirectional_streaming_rpc(g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method) -> None:
+def _generate_bidirectional_streaming_rpc(
+    g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method
+) -> None:
     """Generate a bidirectional streaming RPC with dual API pattern."""
     # Simple iterator method
     g.P("def ", m.py_name, "(")
@@ -68,7 +76,7 @@ def _generate_bidirectional_streaming_rpc(g: protogen.GeneratedFile, f: protogen
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
     g.P("    return self._", m.py_name, "_impl(reqs)")
     g.P()
-    
+
     # Implementation helper
     g.P("async def _", m.py_name, "_impl(")
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "]")
@@ -81,7 +89,7 @@ def _generate_bidirectional_streaming_rpc(g: protogen.GeneratedFile, f: protogen
     g.P("yield response")
     g.set_indent(4)
     g.P()
-    
+
     # Stream method for metadata access
     g.P("async def ", m.py_name, "_stream(")
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "]")
@@ -97,6 +105,9 @@ def _generate_bidirectional_streaming_rpc(g: protogen.GeneratedFile, f: protogen
 
 def generate(gen: protogen.Plugin) -> None:
     for f in gen.files_to_generate:
+        if len(f.services) == 0:
+            continue
+
         g = gen.new_generated_file(
             f.proto.name.replace(".proto", "_pb2_connect.py"),
             f.py_import_path,
@@ -109,11 +120,11 @@ def generate(gen: protogen.Plugin) -> None:
         g.P("from connectrpc.client import ConnectClient")
         g.P("from connectrpc.client import ConnectProtocol")
         g.P("from connectrpc.streams import StreamInput")
-        g.P("from connectrpc.streams import StreamOutput")        
+        g.P("from connectrpc.streams import StreamOutput")
         g.P()
         g.print_import()
         g.P()
-        
+
         for s in f.services:
             g.P("class ", s.py_ident, "Client:")
             g.set_indent(4)
@@ -126,13 +137,13 @@ def generate(gen: protogen.Plugin) -> None:
             g.P("    self.base_url = base_url")
             g.P("    self._connect_client = ConnectClient(http_client, protocol)")
             g.P()
-            
+
             # Generate methods for each RPC
             for m in s.methods:
                 # Assert that method input/output types are resolved
                 assert m.input is not None, f"Method {m.py_name} input should be resolved"
                 assert m.output is not None, f"Method {m.py_name} output should be resolved"
-                
+
                 if not m.proto.client_streaming and not m.proto.server_streaming:
                     _generate_unary_rpc(g, f, s, m)
                 elif not m.proto.client_streaming and m.proto.server_streaming:
@@ -141,7 +152,6 @@ def generate(gen: protogen.Plugin) -> None:
                     _generate_client_streaming_rpc(g, f, s, m)
                 elif m.proto.client_streaming and m.proto.server_streaming:
                     _generate_bidirectional_streaming_rpc(g, f, s, m)
-            
+
             g.set_indent(0)
             g.P()
-
