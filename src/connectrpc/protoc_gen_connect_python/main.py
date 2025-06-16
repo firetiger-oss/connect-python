@@ -2,9 +2,13 @@ import sys
 
 try:
     import protogen
+
     from connectrpc.generator.generator import generate
 except ImportError as e:
-    print(f"Error: Missing compiler dependencies. Install with: pip install connect-python[compiler]", file=sys.stderr)
+    print(
+        "Error: Missing compiler dependencies. Install with: pip install connect-python[compiler]",
+        file=sys.stderr,
+    )
     print(f"Import error: {e}", file=sys.stderr)
     sys.exit(1)
 

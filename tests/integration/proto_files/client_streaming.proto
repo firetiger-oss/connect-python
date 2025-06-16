@@ -1,0 +1,21 @@
+// Test case: Client streaming to server unary
+syntax = "proto3";
+
+package test.clientstreaming.v1;
+
+message StreamRequest {
+  string data = 1;
+}
+
+message AggregateResponse {
+  string result = 1;
+  int32 count = 2;
+}
+
+service StreamingService {
+  // Client streaming: send multiple requests, get one response
+  rpc AggregateData(stream StreamRequest) returns (AggregateResponse);
+  
+  // Also include a regular unary for comparison
+  rpc ProcessSingle(StreamRequest) returns (AggregateResponse);
+}

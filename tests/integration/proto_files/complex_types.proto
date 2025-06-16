@@ -1,0 +1,42 @@
+// Test case: Complex message types with nested structures
+syntax = "proto3";
+
+package test.complex.v1;
+
+enum Priority {
+  PRIORITY_LOW = 0;
+  PRIORITY_MEDIUM = 1;
+  PRIORITY_HIGH = 2;
+}
+
+message Address {
+  string street = 1;
+  string city = 2;
+  string country = 3;
+}
+
+message Person {
+  string name = 1;
+  repeated Address addresses = 2;
+  map<string, string> metadata = 3;
+  Priority priority = 4;
+}
+
+message ComplexRequest {
+  repeated Person people = 1;
+  map<string, Person> person_lookup = 2;
+  oneof data {
+    string text_data = 3;
+    bytes binary_data = 4;
+  }
+}
+
+message ComplexResponse {
+  repeated Person results = 1;
+  map<string, int32> counts = 2;
+}
+
+service ComplexService {
+  rpc ProcessComplex(ComplexRequest) returns (ComplexResponse);
+  rpc StreamComplex(stream ComplexRequest) returns (stream ComplexResponse);
+}

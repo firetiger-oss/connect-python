@@ -1,0 +1,21 @@
+// Test case: Service that imports and uses external message types
+syntax = "proto3";
+
+package test.main.v1;
+
+import "imported_messages.proto";
+
+message ServiceRequest {
+  test.imported.v1.SharedMessage shared_data = 1;
+  test.imported.v1.Status status = 2;
+}
+
+message ServiceResponse {
+  test.imported.v1.NestedMessage result = 1;
+  bool success = 2;
+}
+
+service MainService {
+  rpc ProcessImported(ServiceRequest) returns (ServiceResponse);
+  rpc StreamImported(ServiceRequest) returns (stream ServiceResponse);
+}

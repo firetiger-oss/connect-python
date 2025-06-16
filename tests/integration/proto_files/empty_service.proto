@@ -1,0 +1,9 @@
+// Test case: File with no services (edge case)
+syntax = "proto3";
+
+package test.empty.v1;
+
+// A message but no services
+message EmptyMessage {
+  string value = 1;
+}

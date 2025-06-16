@@ -75,6 +75,10 @@ disallow_untyped_calls = false
 warn_return_any = false
 disable_error_code = ["union-attr"]
 
+[[tool.mypy.overrides]]
+module = "eliza_pb2_connect"
+ignore_missing_imports = true
+
 [tool.ruff]
 target-version = "py310"
 line-length = 100

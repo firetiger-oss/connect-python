@@ -1,0 +1,21 @@
+// Test case: Multiple services in one file
+syntax = "proto3";
+
+package test.multiple.v1;
+
+message Request {
+  string message = 1;
+}
+
+message Response {
+  string reply = 1;
+}
+
+service FirstService {
+  rpc DoSomething(Request) returns (Response);
+}
+
+service SecondService {
+  rpc DoAnother(Request) returns (Response);
+  rpc StreamData(Request) returns (stream Response);
+}
