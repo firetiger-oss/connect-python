@@ -1,25 +1,15 @@
-from collections.abc import Iterable as _Iterable
-from collections.abc import Mapping as _Mapping
-from typing import ClassVar as _ClassVar
-
+from connectrpc.conformance.v1 import config_pb2 as _config_pb2
 from google.protobuf import any_pb2 as _any_pb2
+from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from google.protobuf.internal import containers as _containers
-
-from connectrpc.conformance.v1 import config_pb2 as _config_pb2
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class UnaryResponseDefinition(_message.Message):
-    __slots__ = (
-        "response_headers",
-        "response_data",
-        "error",
-        "response_trailers",
-        "response_delay_ms",
-        "raw_response",
-    )
+    __slots__ = ("response_headers", "response_data", "error", "response_trailers", "response_delay_ms", "raw_response")
     RESPONSE_HEADERS_FIELD_NUMBER: _ClassVar[int]
     RESPONSE_DATA_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
@@ -32,25 +22,10 @@ class UnaryResponseDefinition(_message.Message):
     response_trailers: _containers.RepeatedCompositeFieldContainer[Header]
     response_delay_ms: int
     raw_response: RawHTTPResponse
-    def __init__(
-        self,
-        response_headers: _Iterable[Header | _Mapping] | None = ...,
-        response_data: bytes | None = ...,
-        error: Error | _Mapping | None = ...,
-        response_trailers: _Iterable[Header | _Mapping] | None = ...,
-        response_delay_ms: int | None = ...,
-        raw_response: RawHTTPResponse | _Mapping | None = ...,
-    ) -> None: ...
+    def __init__(self, response_headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., response_data: _Optional[bytes] = ..., error: _Optional[_Union[Error, _Mapping]] = ..., response_trailers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., response_delay_ms: _Optional[int] = ..., raw_response: _Optional[_Union[RawHTTPResponse, _Mapping]] = ...) -> None: ...
 
 class StreamResponseDefinition(_message.Message):
-    __slots__ = (
-        "response_headers",
-        "response_data",
-        "response_delay_ms",
-        "error",
-        "response_trailers",
-        "raw_response",
-    )
+    __slots__ = ("response_headers", "response_data", "response_delay_ms", "error", "response_trailers", "raw_response")
     RESPONSE_HEADERS_FIELD_NUMBER: _ClassVar[int]
     RESPONSE_DATA_FIELD_NUMBER: _ClassVar[int]
     RESPONSE_DELAY_MS_FIELD_NUMBER: _ClassVar[int]
@@ -63,15 +38,7 @@ class StreamResponseDefinition(_message.Message):
     error: Error
     response_trailers: _containers.RepeatedCompositeFieldContainer[Header]
     raw_response: RawHTTPResponse
-    def __init__(
-        self,
-        response_headers: _Iterable[Header | _Mapping] | None = ...,
-        response_data: _Iterable[bytes] | None = ...,
-        response_delay_ms: int | None = ...,
-        error: Error | _Mapping | None = ...,
-        response_trailers: _Iterable[Header | _Mapping] | None = ...,
-        raw_response: RawHTTPResponse | _Mapping | None = ...,
-    ) -> None: ...
+    def __init__(self, response_headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., response_data: _Optional[_Iterable[bytes]] = ..., response_delay_ms: _Optional[int] = ..., error: _Optional[_Union[Error, _Mapping]] = ..., response_trailers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., raw_response: _Optional[_Union[RawHTTPResponse, _Mapping]] = ...) -> None: ...
 
 class UnaryRequest(_message.Message):
     __slots__ = ("response_definition", "request_data")
@@ -79,17 +46,13 @@ class UnaryRequest(_message.Message):
     REQUEST_DATA_FIELD_NUMBER: _ClassVar[int]
     response_definition: UnaryResponseDefinition
     request_data: bytes
-    def __init__(
-        self,
-        response_definition: UnaryResponseDefinition | _Mapping | None = ...,
-        request_data: bytes | None = ...,
-    ) -> None: ...
+    def __init__(self, response_definition: _Optional[_Union[UnaryResponseDefinition, _Mapping]] = ..., request_data: _Optional[bytes] = ...) -> None: ...
 
 class UnaryResponse(_message.Message):
     __slots__ = ("payload",)
     PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     payload: ConformancePayload
-    def __init__(self, payload: ConformancePayload | _Mapping | None = ...) -> None: ...
+    def __init__(self, payload: _Optional[_Union[ConformancePayload, _Mapping]] = ...) -> None: ...
 
 class IdempotentUnaryRequest(_message.Message):
     __slots__ = ("response_definition", "request_data")
@@ -97,17 +60,13 @@ class IdempotentUnaryRequest(_message.Message):
     REQUEST_DATA_FIELD_NUMBER: _ClassVar[int]
     response_definition: UnaryResponseDefinition
     request_data: bytes
-    def __init__(
-        self,
-        response_definition: UnaryResponseDefinition | _Mapping | None = ...,
-        request_data: bytes | None = ...,
-    ) -> None: ...
+    def __init__(self, response_definition: _Optional[_Union[UnaryResponseDefinition, _Mapping]] = ..., request_data: _Optional[bytes] = ...) -> None: ...
 
 class IdempotentUnaryResponse(_message.Message):
     __slots__ = ("payload",)
     PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     payload: ConformancePayload
-    def __init__(self, payload: ConformancePayload | _Mapping | None = ...) -> None: ...
+    def __init__(self, payload: _Optional[_Union[ConformancePayload, _Mapping]] = ...) -> None: ...
 
 class ServerStreamRequest(_message.Message):
     __slots__ = ("response_definition", "request_data")
@@ -115,17 +74,13 @@ class ServerStreamRequest(_message.Message):
     REQUEST_DATA_FIELD_NUMBER: _ClassVar[int]
     response_definition: StreamResponseDefinition
     request_data: bytes
-    def __init__(
-        self,
-        response_definition: StreamResponseDefinition | _Mapping | None = ...,
-        request_data: bytes | None = ...,
-    ) -> None: ...
+    def __init__(self, response_definition: _Optional[_Union[StreamResponseDefinition, _Mapping]] = ..., request_data: _Optional[bytes] = ...) -> None: ...
 
 class ServerStreamResponse(_message.Message):
     __slots__ = ("payload",)
     PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     payload: ConformancePayload
-    def __init__(self, payload: ConformancePayload | _Mapping | None = ...) -> None: ...
+    def __init__(self, payload: _Optional[_Union[ConformancePayload, _Mapping]] = ...) -> None: ...
 
 class ClientStreamRequest(_message.Message):
     __slots__ = ("response_definition", "request_data")
@@ -133,17 +88,13 @@ class ClientStreamRequest(_message.Message):
     REQUEST_DATA_FIELD_NUMBER: _ClassVar[int]
     response_definition: UnaryResponseDefinition
     request_data: bytes
-    def __init__(
-        self,
-        response_definition: UnaryResponseDefinition | _Mapping | None = ...,
-        request_data: bytes | None = ...,
-    ) -> None: ...
+    def __init__(self, response_definition: _Optional[_Union[UnaryResponseDefinition, _Mapping]] = ..., request_data: _Optional[bytes] = ...) -> None: ...
 
 class ClientStreamResponse(_message.Message):
     __slots__ = ("payload",)
     PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     payload: ConformancePayload
-    def __init__(self, payload: ConformancePayload | _Mapping | None = ...) -> None: ...
+    def __init__(self, payload: _Optional[_Union[ConformancePayload, _Mapping]] = ...) -> None: ...
 
 class BidiStreamRequest(_message.Message):
     __slots__ = ("response_definition", "full_duplex", "request_data")
@@ -153,18 +104,13 @@ class BidiStreamRequest(_message.Message):
     response_definition: StreamResponseDefinition
     full_duplex: bool
     request_data: bytes
-    def __init__(
-        self,
-        response_definition: StreamResponseDefinition | _Mapping | None = ...,
-        full_duplex: bool = ...,
-        request_data: bytes | None = ...,
-    ) -> None: ...
+    def __init__(self, response_definition: _Optional[_Union[StreamResponseDefinition, _Mapping]] = ..., full_duplex: bool = ..., request_data: _Optional[bytes] = ...) -> None: ...
 
 class BidiStreamResponse(_message.Message):
     __slots__ = ("payload",)
     PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     payload: ConformancePayload
-    def __init__(self, payload: ConformancePayload | _Mapping | None = ...) -> None: ...
+    def __init__(self, payload: _Optional[_Union[ConformancePayload, _Mapping]] = ...) -> None: ...
 
 class UnimplementedRequest(_message.Message):
     __slots__ = ()
@@ -186,31 +132,17 @@ class ConformancePayload(_message.Message):
         timeout_ms: int
         requests: _containers.RepeatedCompositeFieldContainer[_any_pb2.Any]
         connect_get_info: ConformancePayload.ConnectGetInfo
-        def __init__(
-            self,
-            request_headers: _Iterable[Header | _Mapping] | None = ...,
-            timeout_ms: int | None = ...,
-            requests: _Iterable[_any_pb2.Any | _Mapping] | None = ...,
-            connect_get_info: ConformancePayload.ConnectGetInfo | _Mapping | None = ...,
-        ) -> None: ...
-
+        def __init__(self, request_headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., timeout_ms: _Optional[int] = ..., requests: _Optional[_Iterable[_Union[_any_pb2.Any, _Mapping]]] = ..., connect_get_info: _Optional[_Union[ConformancePayload.ConnectGetInfo, _Mapping]] = ...) -> None: ...
     class ConnectGetInfo(_message.Message):
         __slots__ = ("query_params",)
         QUERY_PARAMS_FIELD_NUMBER: _ClassVar[int]
         query_params: _containers.RepeatedCompositeFieldContainer[Header]
-        def __init__(
-            self, query_params: _Iterable[Header | _Mapping] | None = ...
-        ) -> None: ...
-
+        def __init__(self, query_params: _Optional[_Iterable[_Union[Header, _Mapping]]] = ...) -> None: ...
     DATA_FIELD_NUMBER: _ClassVar[int]
     REQUEST_INFO_FIELD_NUMBER: _ClassVar[int]
     data: bytes
     request_info: ConformancePayload.RequestInfo
-    def __init__(
-        self,
-        data: bytes | None = ...,
-        request_info: ConformancePayload.RequestInfo | _Mapping | None = ...,
-    ) -> None: ...
+    def __init__(self, data: _Optional[bytes] = ..., request_info: _Optional[_Union[ConformancePayload.RequestInfo, _Mapping]] = ...) -> None: ...
 
 class Error(_message.Message):
     __slots__ = ("code", "message", "details")
@@ -220,12 +152,7 @@ class Error(_message.Message):
     code: _config_pb2.Code
     message: str
     details: _containers.RepeatedCompositeFieldContainer[_any_pb2.Any]
-    def __init__(
-        self,
-        code: _config_pb2.Code | str | None = ...,
-        message: str | None = ...,
-        details: _Iterable[_any_pb2.Any | _Mapping] | None = ...,
-    ) -> None: ...
+    def __init__(self, code: _Optional[_Union[_config_pb2.Code, str]] = ..., message: _Optional[str] = ..., details: _Optional[_Iterable[_Union[_any_pb2.Any, _Mapping]]] = ...) -> None: ...
 
 class Header(_message.Message):
     __slots__ = ("name", "value")
@@ -233,20 +160,10 @@ class Header(_message.Message):
     VALUE_FIELD_NUMBER: _ClassVar[int]
     name: str
     value: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(
-        self, name: str | None = ..., value: _Iterable[str] | None = ...
-    ) -> None: ...
+    def __init__(self, name: _Optional[str] = ..., value: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class RawHTTPRequest(_message.Message):
-    __slots__ = (
-        "verb",
-        "uri",
-        "headers",
-        "raw_query_params",
-        "encoded_query_params",
-        "unary",
-        "stream",
-    )
+    __slots__ = ("verb", "uri", "headers", "raw_query_params", "encoded_query_params", "unary", "stream")
     class EncodedQueryParam(_message.Message):
         __slots__ = ("name", "value", "base64_encode")
         NAME_FIELD_NUMBER: _ClassVar[int]
@@ -255,13 +172,7 @@ class RawHTTPRequest(_message.Message):
         name: str
         value: MessageContents
         base64_encode: bool
-        def __init__(
-            self,
-            name: str | None = ...,
-            value: MessageContents | _Mapping | None = ...,
-            base64_encode: bool = ...,
-        ) -> None: ...
-
+        def __init__(self, name: _Optional[str] = ..., value: _Optional[_Union[MessageContents, _Mapping]] = ..., base64_encode: bool = ...) -> None: ...
     VERB_FIELD_NUMBER: _ClassVar[int]
     URI_FIELD_NUMBER: _ClassVar[int]
     HEADERS_FIELD_NUMBER: _ClassVar[int]
@@ -273,21 +184,10 @@ class RawHTTPRequest(_message.Message):
     uri: str
     headers: _containers.RepeatedCompositeFieldContainer[Header]
     raw_query_params: _containers.RepeatedCompositeFieldContainer[Header]
-    encoded_query_params: _containers.RepeatedCompositeFieldContainer[
-        RawHTTPRequest.EncodedQueryParam
-    ]
+    encoded_query_params: _containers.RepeatedCompositeFieldContainer[RawHTTPRequest.EncodedQueryParam]
     unary: MessageContents
     stream: StreamContents
-    def __init__(
-        self,
-        verb: str | None = ...,
-        uri: str | None = ...,
-        headers: _Iterable[Header | _Mapping] | None = ...,
-        raw_query_params: _Iterable[Header | _Mapping] | None = ...,
-        encoded_query_params: _Iterable[RawHTTPRequest.EncodedQueryParam | _Mapping] | None = ...,
-        unary: MessageContents | _Mapping | None = ...,
-        stream: StreamContents | _Mapping | None = ...,
-    ) -> None: ...
+    def __init__(self, verb: _Optional[str] = ..., uri: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., raw_query_params: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., encoded_query_params: _Optional[_Iterable[_Union[RawHTTPRequest.EncodedQueryParam, _Mapping]]] = ..., unary: _Optional[_Union[MessageContents, _Mapping]] = ..., stream: _Optional[_Union[StreamContents, _Mapping]] = ...) -> None: ...
 
 class MessageContents(_message.Message):
     __slots__ = ("binary", "text", "binary_message", "compression")
@@ -299,13 +199,7 @@ class MessageContents(_message.Message):
     text: str
     binary_message: _any_pb2.Any
     compression: _config_pb2.Compression
-    def __init__(
-        self,
-        binary: bytes | None = ...,
-        text: str | None = ...,
-        binary_message: _any_pb2.Any | _Mapping | None = ...,
-        compression: _config_pb2.Compression | str | None = ...,
-    ) -> None: ...
+    def __init__(self, binary: _Optional[bytes] = ..., text: _Optional[str] = ..., binary_message: _Optional[_Union[_any_pb2.Any, _Mapping]] = ..., compression: _Optional[_Union[_config_pb2.Compression, str]] = ...) -> None: ...
 
 class StreamContents(_message.Message):
     __slots__ = ("items",)
@@ -317,18 +211,10 @@ class StreamContents(_message.Message):
         flags: int
         length: int
         payload: MessageContents
-        def __init__(
-            self,
-            flags: int | None = ...,
-            length: int | None = ...,
-            payload: MessageContents | _Mapping | None = ...,
-        ) -> None: ...
-
+        def __init__(self, flags: _Optional[int] = ..., length: _Optional[int] = ..., payload: _Optional[_Union[MessageContents, _Mapping]] = ...) -> None: ...
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     items: _containers.RepeatedCompositeFieldContainer[StreamContents.StreamItem]
-    def __init__(
-        self, items: _Iterable[StreamContents.StreamItem | _Mapping] | None = ...
-    ) -> None: ...
+    def __init__(self, items: _Optional[_Iterable[_Union[StreamContents.StreamItem, _Mapping]]] = ...) -> None: ...
 
 class RawHTTPResponse(_message.Message):
     __slots__ = ("status_code", "headers", "unary", "stream", "trailers")
@@ -342,11 +228,4 @@ class RawHTTPResponse(_message.Message):
     unary: MessageContents
     stream: StreamContents
     trailers: _containers.RepeatedCompositeFieldContainer[Header]
-    def __init__(
-        self,
-        status_code: int | None = ...,
-        headers: _Iterable[Header | _Mapping] | None = ...,
-        unary: MessageContents | _Mapping | None = ...,
-        stream: StreamContents | _Mapping | None = ...,
-        trailers: _Iterable[Header | _Mapping] | None = ...,
-    ) -> None: ...
+    def __init__(self, status_code: _Optional[int] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., unary: _Optional[_Union[MessageContents, _Mapping]] = ..., stream: _Optional[_Union[StreamContents, _Mapping]] = ..., trailers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ...) -> None: ...

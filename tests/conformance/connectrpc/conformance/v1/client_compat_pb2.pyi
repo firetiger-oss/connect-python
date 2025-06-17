@@ -1,42 +1,18 @@
-from collections.abc import Iterable as _Iterable
-from collections.abc import Mapping as _Mapping
-from typing import ClassVar as _ClassVar
-
-from google.protobuf import any_pb2 as _any_pb2
-from google.protobuf import descriptor as _descriptor
-from google.protobuf import empty_pb2 as _empty_pb2
-from google.protobuf import message as _message
-from google.protobuf import struct_pb2 as _struct_pb2
-from google.protobuf.internal import containers as _containers
-
 from connectrpc.conformance.v1 import config_pb2 as _config_pb2
 from connectrpc.conformance.v1 import service_pb2 as _service_pb2
+from google.protobuf import any_pb2 as _any_pb2
+from google.protobuf import empty_pb2 as _empty_pb2
+from google.protobuf import struct_pb2 as _struct_pb2
+from google.protobuf.internal import containers as _containers
+from google.protobuf import descriptor as _descriptor
+from google.protobuf import message as _message
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ClientCompatRequest(_message.Message):
-    __slots__ = (
-        "test_name",
-        "http_version",
-        "protocol",
-        "codec",
-        "compression",
-        "host",
-        "port",
-        "server_tls_cert",
-        "client_tls_creds",
-        "message_receive_limit",
-        "service",
-        "method",
-        "stream_type",
-        "use_get_http_method",
-        "request_headers",
-        "request_messages",
-        "timeout_ms",
-        "request_delay_ms",
-        "cancel",
-        "raw_request",
-    )
+    __slots__ = ("test_name", "http_version", "protocol", "codec", "compression", "host", "port", "server_tls_cert", "client_tls_creds", "message_receive_limit", "service", "method", "stream_type", "use_get_http_method", "request_headers", "request_messages", "timeout_ms", "request_delay_ms", "cancel", "raw_request")
     class Cancel(_message.Message):
         __slots__ = ("before_close_send", "after_close_send_ms", "after_num_responses")
         BEFORE_CLOSE_SEND_FIELD_NUMBER: _ClassVar[int]
@@ -45,13 +21,7 @@ class ClientCompatRequest(_message.Message):
         before_close_send: _empty_pb2.Empty
         after_close_send_ms: int
         after_num_responses: int
-        def __init__(
-            self,
-            before_close_send: _empty_pb2.Empty | _Mapping | None = ...,
-            after_close_send_ms: int | None = ...,
-            after_num_responses: int | None = ...,
-        ) -> None: ...
-
+        def __init__(self, before_close_send: _Optional[_Union[_empty_pb2.Empty, _Mapping]] = ..., after_close_send_ms: _Optional[int] = ..., after_num_responses: _Optional[int] = ...) -> None: ...
     TEST_NAME_FIELD_NUMBER: _ClassVar[int]
     HTTP_VERSION_FIELD_NUMBER: _ClassVar[int]
     PROTOCOL_FIELD_NUMBER: _ClassVar[int]
@@ -92,29 +62,7 @@ class ClientCompatRequest(_message.Message):
     request_delay_ms: int
     cancel: ClientCompatRequest.Cancel
     raw_request: _service_pb2.RawHTTPRequest
-    def __init__(
-        self,
-        test_name: str | None = ...,
-        http_version: _config_pb2.HTTPVersion | str | None = ...,
-        protocol: _config_pb2.Protocol | str | None = ...,
-        codec: _config_pb2.Codec | str | None = ...,
-        compression: _config_pb2.Compression | str | None = ...,
-        host: str | None = ...,
-        port: int | None = ...,
-        server_tls_cert: bytes | None = ...,
-        client_tls_creds: _config_pb2.TLSCreds | _Mapping | None = ...,
-        message_receive_limit: int | None = ...,
-        service: str | None = ...,
-        method: str | None = ...,
-        stream_type: _config_pb2.StreamType | str | None = ...,
-        use_get_http_method: bool = ...,
-        request_headers: _Iterable[_service_pb2.Header | _Mapping] | None = ...,
-        request_messages: _Iterable[_any_pb2.Any | _Mapping] | None = ...,
-        timeout_ms: int | None = ...,
-        request_delay_ms: int | None = ...,
-        cancel: ClientCompatRequest.Cancel | _Mapping | None = ...,
-        raw_request: _service_pb2.RawHTTPRequest | _Mapping | None = ...,
-    ) -> None: ...
+    def __init__(self, test_name: _Optional[str] = ..., http_version: _Optional[_Union[_config_pb2.HTTPVersion, str]] = ..., protocol: _Optional[_Union[_config_pb2.Protocol, str]] = ..., codec: _Optional[_Union[_config_pb2.Codec, str]] = ..., compression: _Optional[_Union[_config_pb2.Compression, str]] = ..., host: _Optional[str] = ..., port: _Optional[int] = ..., server_tls_cert: _Optional[bytes] = ..., client_tls_creds: _Optional[_Union[_config_pb2.TLSCreds, _Mapping]] = ..., message_receive_limit: _Optional[int] = ..., service: _Optional[str] = ..., method: _Optional[str] = ..., stream_type: _Optional[_Union[_config_pb2.StreamType, str]] = ..., use_get_http_method: bool = ..., request_headers: _Optional[_Iterable[_Union[_service_pb2.Header, _Mapping]]] = ..., request_messages: _Optional[_Iterable[_Union[_any_pb2.Any, _Mapping]]] = ..., timeout_ms: _Optional[int] = ..., request_delay_ms: _Optional[int] = ..., cancel: _Optional[_Union[ClientCompatRequest.Cancel, _Mapping]] = ..., raw_request: _Optional[_Union[_service_pb2.RawHTTPRequest, _Mapping]] = ...) -> None: ...
 
 class ClientCompatResponse(_message.Message):
     __slots__ = ("test_name", "response", "error")
@@ -124,23 +72,10 @@ class ClientCompatResponse(_message.Message):
     test_name: str
     response: ClientResponseResult
     error: ClientErrorResult
-    def __init__(
-        self,
-        test_name: str | None = ...,
-        response: ClientResponseResult | _Mapping | None = ...,
-        error: ClientErrorResult | _Mapping | None = ...,
-    ) -> None: ...
+    def __init__(self, test_name: _Optional[str] = ..., response: _Optional[_Union[ClientResponseResult, _Mapping]] = ..., error: _Optional[_Union[ClientErrorResult, _Mapping]] = ...) -> None: ...
 
 class ClientResponseResult(_message.Message):
-    __slots__ = (
-        "response_headers",
-        "payloads",
-        "error",
-        "response_trailers",
-        "num_unsent_requests",
-        "http_status_code",
-        "feedback",
-    )
+    __slots__ = ("response_headers", "payloads", "error", "response_trailers", "num_unsent_requests", "http_status_code", "feedback")
     RESPONSE_HEADERS_FIELD_NUMBER: _ClassVar[int]
     PAYLOADS_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
@@ -155,30 +90,16 @@ class ClientResponseResult(_message.Message):
     num_unsent_requests: int
     http_status_code: int
     feedback: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(
-        self,
-        response_headers: _Iterable[_service_pb2.Header | _Mapping] | None = ...,
-        payloads: _Iterable[_service_pb2.ConformancePayload | _Mapping] | None = ...,
-        error: _service_pb2.Error | _Mapping | None = ...,
-        response_trailers: _Iterable[_service_pb2.Header | _Mapping] | None = ...,
-        num_unsent_requests: int | None = ...,
-        http_status_code: int | None = ...,
-        feedback: _Iterable[str] | None = ...,
-    ) -> None: ...
+    def __init__(self, response_headers: _Optional[_Iterable[_Union[_service_pb2.Header, _Mapping]]] = ..., payloads: _Optional[_Iterable[_Union[_service_pb2.ConformancePayload, _Mapping]]] = ..., error: _Optional[_Union[_service_pb2.Error, _Mapping]] = ..., response_trailers: _Optional[_Iterable[_Union[_service_pb2.Header, _Mapping]]] = ..., num_unsent_requests: _Optional[int] = ..., http_status_code: _Optional[int] = ..., feedback: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class ClientErrorResult(_message.Message):
     __slots__ = ("message",)
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     message: str
-    def __init__(self, message: str | None = ...) -> None: ...
+    def __init__(self, message: _Optional[str] = ...) -> None: ...
 
 class WireDetails(_message.Message):
-    __slots__ = (
-        "actual_status_code",
-        "connect_error_raw",
-        "actual_http_trailers",
-        "actual_grpcweb_trailers",
-    )
+    __slots__ = ("actual_status_code", "connect_error_raw", "actual_http_trailers", "actual_grpcweb_trailers")
     ACTUAL_STATUS_CODE_FIELD_NUMBER: _ClassVar[int]
     CONNECT_ERROR_RAW_FIELD_NUMBER: _ClassVar[int]
     ACTUAL_HTTP_TRAILERS_FIELD_NUMBER: _ClassVar[int]
@@ -187,10 +108,4 @@ class WireDetails(_message.Message):
     connect_error_raw: _struct_pb2.Struct
     actual_http_trailers: _containers.RepeatedCompositeFieldContainer[_service_pb2.Header]
     actual_grpcweb_trailers: str
-    def __init__(
-        self,
-        actual_status_code: int | None = ...,
-        connect_error_raw: _struct_pb2.Struct | _Mapping | None = ...,
-        actual_http_trailers: _Iterable[_service_pb2.Header | _Mapping] | None = ...,
-        actual_grpcweb_trailers: str | None = ...,
-    ) -> None: ...
+    def __init__(self, actual_status_code: _Optional[int] = ..., connect_error_raw: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., actual_http_trailers: _Optional[_Iterable[_Union[_service_pb2.Header, _Mapping]]] = ..., actual_grpcweb_trailers: _Optional[str] = ...) -> None: ...

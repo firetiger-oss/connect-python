@@ -1,8 +1,56 @@
+import asyncio
+import aiohttp
 import struct
 import sys
+import traceback
 
+from connectrpc.client import ConnectProtocol
+
+from connectrpc.conformance.v1.config_pb2 import Protocol
+from connectrpc.conformance.v1.config_pb2 import Codec
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatRequest
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatResponse
+from connectrpc.conformance.v1.client_compat_pb2 import ClientErrorResult
+from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
+from connectrpc.conformance.v1.service_pb2 import UnaryRequest
+
+
+async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
+    """Handle a ClientCompatRequest and return a blank ClientCompatResponse."""
+
+    response = ClientCompatResponse()
+    response.test_name = request.test_name
+    try:
+        async with aiohttp.ClientSession() as http_session:
+            if request.protocol != Protocol.PROTOCOL_CONNECT:
+                raise NotImplementedError
+            if request.codec == Codec.CODEC_JSON:
+                protocol = ConnectProtocol.CONNECT_JSON
+            elif request.codec == Codec.CODEC_PROTO:
+                protocol = ConnectProtocol.CONNECT_PROTOBUF
+            else:
+                raise NotImplementedError
+
+            client = ConformanceServiceClient(
+                base_url="http://" + request.host + ":" + str(request.port),
+                http_client=http_session,
+                protocol=protocol,
+            )
+
+            if request.method == "Unary":
+                assert len(request.request_messages) == 1
+                req_msg = request.request_messages[0]
+                request_payload = UnaryRequest()
+                assert req_msg.Is(request_payload.DESCRIPTOR)
+                req_msg.Unpack(request_payload)
+                server_response = await client.unary(request_payload)
+            else:
+                raise NotImplementedError
+
+        return response
+    except Exception as e:
+        response.error.CopyFrom(ClientErrorResult(message=traceback.format_exc()))
+        return response
 
 
 def read_size_delimited_message():
@@ -34,13 +82,6 @@ def write_size_delimited_message(message_bytes):
     sys.stdout.buffer.flush()
 
 
-def handle(request: ClientCompatRequest) -> ClientCompatResponse:
-    """Handle a ClientCompatRequest and return a blank ClientCompatResponse."""
-    response = ClientCompatResponse()
-    response.test_name = request.test_name
-    return response
-
-
 def main():
     """Main loop that reads requests from stdin and writes responses to stdout."""
     while True:
@@ -54,7 +95,7 @@ def main():
             request.ParseFromString(message_bytes)
 
             # Handle the request
-            response = handle(request)
+            response = asyncio.run(handle(request))
 
             # Write the response
             response_bytes = response.SerializeToString()
