@@ -1,4 +1,5 @@
 import asyncio
+import time
 import struct
 import sys
 import traceback
@@ -92,6 +93,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     for msg in request.request_messages:
                         req_payload = ClientStreamRequest()
                         msg.Unpack(req_payload)
+                        time.sleep(request.request_delay_ms / 1000.0)                        
                         yield req_payload
 
                 try:
@@ -109,6 +111,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     for msg in request.request_messages:
                         req_payload = ClientStreamRequest()
                         msg.Unpack(req_payload)
+                        time.sleep(request.request_delay_ms / 1000.0)
                         yield req_payload
 
                 try:
