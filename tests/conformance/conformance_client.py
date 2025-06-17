@@ -23,6 +23,7 @@ from connectrpc.conformance.v1.service_pb2 import UnaryRequest
 from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
+from connectrpc.streams import StreamOutput
 
 
 async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
@@ -75,22 +76,15 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                 req_msg.Unpack(request_payload)
 
                 try:
-                    response_stream = await client.server_stream_stream(
+                    stream_output = await client.server_stream_stream(
                         request_payload, extra_headers=extra_headers
                     )
-                    async for server_msg in response_stream:
-                        response.response.payloads.append(server_msg.payload)
-
-                    resp_headers = multidict_to_proto(response_stream.response_headers())
-                    response.response.response_headers.extend(resp_headers)
-
-                    resp_trailers = response_stream.trailing_metadata()
-                    if resp_trailers is not None:
-                        resp_trailers_proto = [Header(name=k, value=v) for k, v in resp_trailers.items()]
-                        response.response.response_trailers.extend(resp_trailers_proto)
-
-                except ConnectError as error:
-                    response.response.CopyFrom(error_response(error))
+                    result = await result_from_stream_output(stream_output)
+                    response.response.MergeFrom(result)
+                except Exception as error:
+                    result = await result_from_stream_output(stream_output)
+                    response.response.MergeFrom(result)
+                    response.response.MergeFrom(error_response(error))
 
             elif request.method == "ClientStream":
 
@@ -118,22 +112,14 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         yield req_payload
 
                 try:
-                    response_stream = await client.bidi_stream_stream(
+                    stream_output = await client.bidi_stream_stream(
                         client_requests(), extra_headers=extra_headers
                     )
-
-                    async for server_msg in response_stream:
-                        response.response.payloads.append(server_msg.payload)
-
-                    resp_headers = multidict_to_proto(response_stream.response_headers())
-                    response.response.response_headers.extend(resp_headers)
-
-                    resp_trailers = response_stream.trailing_metadata()
-                    if resp_trailers is not None:
-                        resp_trailers_proto = [Header(name=k, value=v) for k, v in resp_trailers.items()]
-                        response.response.response_trailers.extend(resp_trailers_proto)
-
+                    result = await result_from_stream_output(stream_output)
+                    response.response.MergeFrom(result)
                 except ConnectError as error:
+                    result = await result_from_stream_output(stream_output)
+                    response.response.MergeFrom(result)
                     response.response.CopyFrom(error_response(error))
 
             else:
@@ -143,6 +129,22 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
     except Exception:
         response.error.CopyFrom(ClientErrorResult(message=traceback.format_exc()))
         return response
+
+
+async def result_from_stream_output(stream_output: StreamOutput) -> ClientResponseResult:
+    result = ClientResponseResult()
+    async for server_msg in stream_output:
+        result.payloads.append(server_msg.payload)
+
+    resp_headers = multidict_to_proto(stream_output.response_headers())
+    result.response_headers.extend(resp_headers)
+
+    resp_trailers = stream_output.trailing_metadata()
+    if resp_trailers is not None:
+        resp_trailers_proto = [Header(name=k, value=v) for k, v in resp_trailers.items()]
+        result.response_trailers.extend(resp_trailers_proto)
+
+    return result
 
 
 def request_headers(req: ClientCompatRequest) -> CIMultiDict[str]:
@@ -161,7 +163,10 @@ def multidict_to_proto(headers: CIMultiDict) -> list[Header]:
     return result
 
 
-def error_response(error: ConnectError) -> ClientResponseResult:
+def error_response(error: Exception) -> ClientResponseResult:
+    if not isinstance(error, ConnectError):
+        error = ConnectError(ConnectErrorCode.INTERNAL, str(error))
+
     details: list[Any] = []
     if isinstance(error.details, list):
         for d in error.details:

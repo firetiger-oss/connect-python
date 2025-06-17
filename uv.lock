@@ -182,11 +182,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.12.12" },
-    { name = "multidict", specifier = ">=6.4.4" },
+    { name = "aiohttp", specifier = ">=3.1" },
+    { name = "multidict" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "protobuf", specifier = ">=6.31.1" },
-    { name = "protogen", marker = "extra == 'compiler'", specifier = ">=0.3.1" },
+    { name = "protobuf" },
+    { name = "protogen", marker = "extra == 'compiler'", specifier = ">=0.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },

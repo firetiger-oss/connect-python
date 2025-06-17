@@ -131,14 +131,15 @@ class ConnectStreamOutput(StreamOutput[T]):
                 # This is an EndStreamResponse
                 encoded = await self._response_body.read(-1)
                 end_stream_response = EndStreamResponse.from_bytes(encoded)
-                if end_stream_response.error is not None:
-                    raise end_stream_response.error
-
                 self._trailing_metadata = end_stream_response.metadata
                 self._consumed = True
 
                 # Stream is now complete - release connection before StopAsyncIteration
                 await self.done()
+
+                if end_stream_response.error is not None:
+                    raise end_stream_response.error
+
                 raise StopAsyncIteration
 
             length = struct.unpack(">I", envelope[1:5])[0]
