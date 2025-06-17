@@ -26,6 +26,8 @@ from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
 from connectrpc.streams import StreamOutput
 
+# Imported for their side effects of loading protobuf registry
+import google.protobuf.descriptor_pb2  # noqa: F401
 
 async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
     """Handle a ClientCompatRequest and return a blank ClientCompatResponse."""
@@ -63,10 +65,12 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                 response.test_name = request.test_name
                 try:
                     server_response = await client.unary(
-                        request_payload, extra_headers=extra_headers
+                        request_payload,
+                        extra_headers=extra_headers,
+                        timeout_seconds=request.timeout_ms / 1000.0,
                     )
                     response.response.payloads.append(server_response.payload)
-                except ConnectError as error:
+                except Exception as error:
                     response.response.CopyFrom(error_response(error))
 
             elif request.method == "ServerStream":
@@ -78,13 +82,18 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
                 try:
                     stream_output = await client.server_stream_stream(
-                        request_payload, extra_headers=extra_headers
+                        request_payload,
+                        extra_headers=extra_headers,
+                        timeout_seconds=request.timeout_ms / 1000.0,
                     )
                     result = await result_from_stream_output(stream_output)
                     response.response.MergeFrom(result)
                 except Exception as error:
-                    result = await result_from_stream_output(stream_output)
-                    response.response.MergeFrom(result)
+                    try:
+                        result = await result_from_stream_output(stream_output)
+                        response.response.MergeFrom(result)
+                    except:
+                        pass
                     response.response.MergeFrom(error_response(error))
 
             elif request.method == "ClientStream":
@@ -98,11 +107,13 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
                 try:
                     server_response = await client.client_stream(
-                        client_requests(), extra_headers=extra_headers
+                        client_requests(),
+                        extra_headers=extra_headers,
+                        timeout_seconds=request.timeout_ms / 1000.0,
                     )
                     response.response.payloads.append(server_response.payload)
 
-                except ConnectError as error:
+                except Exception as error:
                     response.response.CopyFrom(error_response(error))
 
             elif request.method == "BidiStream":
@@ -116,13 +127,18 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
                 try:
                     stream_output = await client.bidi_stream_stream(
-                        client_requests(), extra_headers=extra_headers
+                        client_requests(),
+                        extra_headers=extra_headers,
+                        timeout_seconds=request.timeout_ms / 1000.0,
                     )
                     result = await result_from_stream_output(stream_output)
                     response.response.MergeFrom(result)
-                except ConnectError as error:
-                    result = await result_from_stream_output(stream_output)
-                    response.response.MergeFrom(result)
+                except Exception as error:
+                    try:
+                        result = await result_from_stream_output(stream_output)
+                        response.response.MergeFrom(result)
+                    except:
+                        pass
                     response.response.CopyFrom(error_response(error))
 
             else:
@@ -167,6 +183,9 @@ def multidict_to_proto(headers: CIMultiDict) -> list[Header]:
 
 
 def error_response(error: Exception) -> ClientResponseResult:
+    if isinstance(error, TimeoutError):
+        error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
+    
     if not isinstance(error, ConnectError):
         error = ConnectError(ConnectErrorCode.INTERNAL, str(error))
 
