@@ -209,13 +209,10 @@ class ConnectError(Exception):
         code_name = data.get("code")
         message = data.get("message", "")
 
-        if not code_name:
-            raise ValueError("Error response missing required 'code' field")
-
         # Parse the Connect error code
         code = ConnectErrorCode.from_code_name(code_name)
         if not code:
-            raise ValueError(f"Unknown Connect error code: {code_name}")
+            code = infer_connect_code_from_http_status(http_status)
 
         # Extract additional details (everything except code/message)
         details = data.get("details", [])
