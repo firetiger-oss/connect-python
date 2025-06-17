@@ -7,6 +7,7 @@ from google.protobuf.message import Message
 from .client_base import BaseClient
 from .headers import HeaderInput
 from .streams import StreamOutput
+from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
 
@@ -21,7 +22,7 @@ class ConnectGRPCWebClient(BaseClient):
         req: Message,
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
-    ) -> T:
+    ) -> UnaryOutput[T]:
         raise NotImplementedError
 
     async def call_streaming(

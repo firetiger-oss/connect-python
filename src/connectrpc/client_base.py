@@ -6,6 +6,7 @@ from google.protobuf.message import Message
 
 from .headers import HeaderInput
 from .streams import StreamOutput
+from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
 
@@ -17,8 +18,8 @@ class BaseClient(Protocol):
         req: Message,
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
-        timeout_seconds: float | None = None,            
-    ) -> T: ...
+        timeout_seconds: float | None = None,
+    ) -> UnaryOutput[T]: ...
 
     async def call_streaming(
         self,
@@ -26,5 +27,5 @@ class BaseClient(Protocol):
         reqs: AsyncIterator[Message],
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
-        timeout_seconds: float | None = None,            
+        timeout_seconds: float | None = None,
     ) -> StreamOutput[T]: ...

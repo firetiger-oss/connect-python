@@ -8,6 +8,7 @@ from typing import TypeVar
 import aiohttp
 from google.protobuf.message import Message
 from multidict import CIMultiDict
+from multidict import MultiDict
 
 from .client_base import BaseClient
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
@@ -18,6 +19,7 @@ from .headers import HeaderInput
 from .headers import merge_headers
 from .streams import StreamOutput
 from .streams_connect import EndStreamResponse
+from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
 
@@ -38,7 +40,7 @@ class ConnectProtocolClient(BaseClient):
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> T:
+    ) -> UnaryOutput[T]:
         data = self.serde.serialize(req)
         headers = CIMultiDict(
             [
@@ -53,7 +55,9 @@ class ConnectProtocolClient(BaseClient):
         else:
             timeout = aiohttp.ClientTimeout(total=None)
 
-        async with self._http_client.request("POST", url, data=data, headers=headers, timeout=timeout) as resp:
+        async with self._http_client.request(
+            "POST", url, data=data, headers=headers, timeout=timeout
+        ) as resp:
             if resp.status != 200:
                 raise await self.unary_error(resp)
 
@@ -61,10 +65,17 @@ class ConnectProtocolClient(BaseClient):
                 raise ConnectProtocolError(
                     f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
                 )
-            body = await resp.read()
-            response_msg = self.serde.deserialize(body, response_type)
 
-            return response_msg
+            output = ConnectUnaryOutput(response_headers=resp.headers)
+
+            try:
+                body = await resp.read()
+                response_msg = self.serde.deserialize(body, response_type)
+            except Exception as e:
+                raise ConnectPartialUnaryResponse(output) from e
+
+            output._message = response_msg
+            return output
 
     async def call_streaming(
         self,
@@ -95,7 +106,9 @@ class ConnectProtocolClient(BaseClient):
         else:
             timeout = aiohttp.ClientTimeout(total=None)
 
-        resp = await self._http_client.request("POST", url, data=payload, headers=headers, timeout=timeout)
+        resp = await self._http_client.request(
+            "POST", url, data=payload, headers=headers, timeout=timeout
+        )
         if resp.status != 200:
             txt = await resp.text()
             raise ConnectError.from_http_response(resp.status, txt)
@@ -110,6 +123,35 @@ class ConnectProtocolClient(BaseClient):
     async def unary_error(self, resp: aiohttp.ClientResponse) -> ConnectError:
         txt = await resp.text()
         return ConnectError.from_http_response(resp.status, txt)
+
+
+class ConnectUnaryOutput(UnaryOutput[T]):
+    def __init__(self, message: T | None = None, response_headers: MultiDict[str] | None = None):
+        self._message = message
+        self._response_headers = response_headers
+
+    def message(self) -> T | None:
+        return self._message
+
+    def response_headers(self) -> MultiDict[str] | None:
+        return self._response_headers
+
+    def response_trailers(self) -> MultiDict[str] | None:
+        # Connect Unary responses encode trailers in headers
+        if self._response_headers is None:
+            return None
+
+        trailers = MultiDict()
+        for key in self._response_headers:
+            key_clean = str(key).lower()
+            if key_clean.startswith("trailer-"):
+                # Strip 'trailer-' prefix
+                vals = self._response_headers.getall(key)
+                key_new = key_clean.removeprefix("trailer-")
+                for v in vals:
+                    trailers.add(key_new, v)
+
+        return trailers
 
 
 class ConnectStreamOutput(StreamOutput[T]):
@@ -196,3 +238,9 @@ class ConnectStreamOutput(StreamOutput[T]):
         if not self._released:
             self._released = True
             await self._response.release()
+
+
+class ConnectPartialUnaryResponse(Exception):
+    def __init__(self, partial_response: ConnectUnaryOutput):
+        super().__init__("server response was interrupted, partial content received")
+        self.partial_response = partial_response

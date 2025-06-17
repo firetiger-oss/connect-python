@@ -19,16 +19,26 @@ def _generate_unary_rpc(
     g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method
 ) -> None:
     """Generate a unary RPC method."""
-    g.P("async def ", m.py_name, "(")
+    g.P("async def ", m.py_name, "_with_metadata(")
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
-    g.P(") -> ", m.output.py_ident, ":")
+    g.P(") -> UnaryOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
     g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P(
         "return await self._connect_client.call_unary(url, req, ",
-        m.output.py_ident, ",", common_args_str, ")",
+        m.output.py_ident,
+        ",",
+        common_args_str,
+        ")",
     )
-
+    g.set_indent(4)
+    g.P()
+    g.P("async def ", m.py_name, "(")
+    g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
+    g.P(") -> ", m.output.py_ident, ":")
+    g.set_indent(8)
+    g.P("response = await self.", m.py_name, "_with_metadata(req, ", common_args_str, ")")
+    g.P("return response.message()")
     g.set_indent(4)
     g.P()
 
@@ -112,7 +122,12 @@ def _generate_bidirectional_streaming_rpc(
 
     # Stream method for metadata access
     g.P("async def ", m.py_name, "_stream(")
-    g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str,)
+    g.P(
+        "    self, reqs: StreamInput[",
+        m.input.py_ident,
+        "], ",
+        common_params_str,
+    )
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
     g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
@@ -143,6 +158,7 @@ def generate(gen: protogen.Plugin) -> None:
         g.P("from connectrpc.headers import HeaderInput")
         g.P("from connectrpc.streams import StreamInput")
         g.P("from connectrpc.streams import StreamOutput")
+        g.P("from connectrpc.unary import UnaryOutput")
         g.P()
         g.print_import()
         g.P()
