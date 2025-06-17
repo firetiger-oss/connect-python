@@ -52,8 +52,6 @@ class ConnectProtocolClient(BaseClient):
 
         if timeout_seconds is not None and timeout_seconds > 0:
             headers["Connect-Timeout-Ms"] = str(int(timeout_seconds / 1000))
-
-        if timeout_seconds is not None:
             timeout = aiohttp.ClientTimeout(total=timeout_seconds)
         else:
             timeout = aiohttp.ClientTimeout(total=None)
