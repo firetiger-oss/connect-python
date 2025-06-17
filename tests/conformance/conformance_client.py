@@ -1,7 +1,6 @@
 import asyncio
 import struct
 import sys
-import time
 import traceback
 
 import aiohttp
@@ -106,7 +105,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     for msg in request.request_messages:
                         req_payload = ClientStreamRequest()
                         msg.Unpack(req_payload)
-                        time.sleep(request.request_delay_ms / 1000.0)
+                        await asyncio.sleep(request.request_delay_ms / 1000.0)
                         yield req_payload
 
                 try:
@@ -126,10 +125,13 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     for msg in request.request_messages:
                         req_payload = ClientStreamRequest()
                         msg.Unpack(req_payload)
-                        time.sleep(request.request_delay_ms / 1000.0)
+                        await asyncio.sleep(request.request_delay_ms / 1000.0)
                         yield req_payload
 
                 try:
+                    import sys
+                    print("timeout is: ", request.timeout_ms, file=sys.stderr)
+                    print("sleep is: ", request.request_delay_ms, file=sys.stderr)                    
                     stream_output = await client.bidi_stream_stream(
                         client_requests(),
                         extra_headers=extra_headers,
