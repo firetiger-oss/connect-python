@@ -26,8 +26,8 @@ integration-test:
 protoc-gen *ARGS:
     protoc --plugin=protoc-gen-connect_python=.venv/bin/protoc-gen-connect_python {{ARGS}}
 
-# Run conformance tests (requires connectconformance binary)
-conformance-test:
+# Run conformance tests (requires connectconformance binary). Usage: just conformance-test [ARGS...]
+conformance-test *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v connectconformance &> /dev/null; then
@@ -40,6 +40,7 @@ conformance-test:
     connectconformance \
         --conf ./config.yaml \
         --mode client \
+        {{ARGS}} \
         -- \
         uv run python conformance_client.py
 
