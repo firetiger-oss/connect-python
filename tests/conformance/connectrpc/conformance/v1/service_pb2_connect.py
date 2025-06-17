@@ -8,6 +8,7 @@ from connectrpc.client import ConnectProtocol
 from connectrpc.headers import HeaderInput
 from connectrpc.streams import StreamInput
 from connectrpc.streams import StreamOutput
+from connectrpc.unary import UnaryOutput
 
 import connectrpc.conformance.v1.service_pb2
 
@@ -21,11 +22,17 @@ class ConformanceServiceClient:
         self.base_url = base_url
         self._connect_client = ConnectClient(http_client, protocol)
 
+    async def unary_with_metadata(
+        self, req: connectrpc.conformance.v1.service_pb2.UnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
+    ) -> UnaryOutput[connectrpc.conformance.v1.service_pb2.UnaryResponse]:
+        url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/Unary"
+        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.UnaryResponse,extra_headers, timeout_seconds)
+
     async def unary(
         self, req: connectrpc.conformance.v1.service_pb2.UnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> connectrpc.conformance.v1.service_pb2.UnaryResponse:
-        url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/Unary"
-        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.UnaryResponse,extra_headers, timeout_seconds)
+        response = await self.unary_with_metadata(req, extra_headers, timeout_seconds)
+        return response.message()
 
     def server_stream(
         self, req: connectrpc.conformance.v1.service_pb2.ServerStreamRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -75,15 +82,27 @@ class ConformanceServiceClient:
             url, reqs, connectrpc.conformance.v1.service_pb2.BidiStreamResponse, extra_headers, timeout_seconds
         )
 
+    async def unimplemented_with_metadata(
+        self, req: connectrpc.conformance.v1.service_pb2.UnimplementedRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
+    ) -> UnaryOutput[connectrpc.conformance.v1.service_pb2.UnimplementedResponse]:
+        url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/Unimplemented"
+        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.UnimplementedResponse,extra_headers, timeout_seconds)
+
     async def unimplemented(
         self, req: connectrpc.conformance.v1.service_pb2.UnimplementedRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> connectrpc.conformance.v1.service_pb2.UnimplementedResponse:
-        url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/Unimplemented"
-        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.UnimplementedResponse,extra_headers, timeout_seconds)
+        response = await self.unimplemented_with_metadata(req, extra_headers, timeout_seconds)
+        return response.message()
+
+    async def idempotent_unary_with_metadata(
+        self, req: connectrpc.conformance.v1.service_pb2.IdempotentUnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
+    ) -> UnaryOutput[connectrpc.conformance.v1.service_pb2.IdempotentUnaryResponse]:
+        url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/IdempotentUnary"
+        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.IdempotentUnaryResponse,extra_headers, timeout_seconds)
 
     async def idempotent_unary(
         self, req: connectrpc.conformance.v1.service_pb2.IdempotentUnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> connectrpc.conformance.v1.service_pb2.IdempotentUnaryResponse:
-        url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/IdempotentUnary"
-        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.IdempotentUnaryResponse,extra_headers, timeout_seconds)
+        response = await self.idempotent_unary_with_metadata(req, extra_headers, timeout_seconds)
+        return response.message()
 

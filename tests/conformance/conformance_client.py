@@ -1,10 +1,13 @@
 import asyncio
-import time
 import struct
 import sys
+import time
 import traceback
 
 import aiohttp
+
+# Imported for their side effects of loading protobuf registry
+import google.protobuf.descriptor_pb2  # noqa: F401
 from google.protobuf.any_pb2 import Any
 from multidict import CIMultiDict
 
@@ -25,9 +28,8 @@ from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClie
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
 from connectrpc.streams import StreamOutput
+from connectrpc.unary import UnaryOutput
 
-# Imported for their side effects of loading protobuf registry
-import google.protobuf.descriptor_pb2  # noqa: F401
 
 async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
     """Handle a ClientCompatRequest and return a blank ClientCompatResponse."""
@@ -64,12 +66,13 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                 response = ClientCompatResponse()
                 response.test_name = request.test_name
                 try:
-                    server_response = await client.unary(
+                    server_response = await client.unary_with_metadata(
                         request_payload,
                         extra_headers=extra_headers,
                         timeout_seconds=request.timeout_ms / 1000.0,
                     )
-                    response.response.payloads.append(server_response.payload)
+                    result = result_from_unary_output(server_response)
+                    response.response.MergeFrom(result)
                 except Exception as error:
                     response.response.CopyFrom(error_response(error))
 
@@ -92,7 +95,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     try:
                         result = await result_from_stream_output(stream_output)
                         response.response.MergeFrom(result)
-                    except:
+                    except Exception:
                         pass
                     response.response.MergeFrom(error_response(error))
 
@@ -102,7 +105,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     for msg in request.request_messages:
                         req_payload = ClientStreamRequest()
                         msg.Unpack(req_payload)
-                        time.sleep(request.request_delay_ms / 1000.0)                        
+                        time.sleep(request.request_delay_ms / 1000.0)
                         yield req_payload
 
                 try:
@@ -137,7 +140,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     try:
                         result = await result_from_stream_output(stream_output)
                         response.response.MergeFrom(result)
-                    except:
+                    except Exception:
                         pass
                     response.response.CopyFrom(error_response(error))
 
@@ -166,6 +169,21 @@ async def result_from_stream_output(stream_output: StreamOutput) -> ClientRespon
     return result
 
 
+def result_from_unary_output(unary_output: UnaryOutput) -> ClientResponseResult:
+    result = ClientResponseResult()
+    result.payloads.append(unary_output.message().payload)
+
+    resp_headers = multidict_to_proto(unary_output.response_headers())
+    result.response_headers.extend(resp_headers)
+
+    resp_trailers = unary_output.response_trailers()
+    if resp_trailers is not None:
+        resp_trailers_proto = multidict_to_proto(resp_trailers)
+        result.response_trailers.extend(resp_trailers_proto)
+
+    return result
+
+
 def request_headers(req: ClientCompatRequest) -> CIMultiDict[str]:
     """Convert protobuf headers to CIMultiDict, preserving all values."""
     headers = CIMultiDict()
@@ -185,7 +203,7 @@ def multidict_to_proto(headers: CIMultiDict) -> list[Header]:
 def error_response(error: Exception) -> ClientResponseResult:
     if isinstance(error, TimeoutError):
         error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
-    
+
     if not isinstance(error, ConnectError):
         error = ConnectError(ConnectErrorCode.INTERNAL, str(error))
 
