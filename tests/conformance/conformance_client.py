@@ -24,6 +24,7 @@ from connectrpc.conformance.v1.service_pb2 import Error
 from connectrpc.conformance.v1.service_pb2 import Header
 from connectrpc.conformance.v1.service_pb2 import ServerStreamRequest
 from connectrpc.conformance.v1.service_pb2 import UnaryRequest
+from connectrpc.conformance.v1.service_pb2 import UnimplementedRequest
 from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
@@ -141,7 +142,29 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         result = await result_from_stream_output(stream_output)
                         response.response.MergeFrom(result)
                     except Exception:
-                        pass
+                        raise
+                    response.response.CopyFrom(error_response(error))
+
+            elif request.method == "Unimplemented":
+                # Same as Unary
+                assert len(request.request_messages) == 1
+                req_msg = request.request_messages[0]
+                request_payload = UnimplementedRequest()
+
+                assert req_msg.Is(request_payload.DESCRIPTOR)
+                req_msg.Unpack(request_payload)
+
+                response = ClientCompatResponse()
+                response.test_name = request.test_name
+                try:
+                    server_response = await client.unimplemented_with_metadata(
+                        request_payload,
+                        extra_headers=extra_headers,
+                        timeout_seconds=request.timeout_ms / 1000.0,
+                    )
+                    result = result_from_unary_output(server_response)
+                    response.response.MergeFrom(result)
+                except Exception as error:
                     response.response.CopyFrom(error_response(error))
 
             else:
