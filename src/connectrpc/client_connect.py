@@ -142,14 +142,12 @@ class ConnectUnaryOutput(UnaryOutput[T]):
             return None
 
         trailers = MultiDict()
-        for key in self._response_headers:
+        for key, value in self._response_headers.items():
             key_clean = str(key).lower()
             if key_clean.startswith("trailer-"):
                 # Strip 'trailer-' prefix
-                vals = self._response_headers.getall(key)
                 key_new = key_clean.removeprefix("trailer-")
-                for v in vals:
-                    trailers.add(key_new, v)
+                trailers.add(key_new, value)
 
         return trailers
 
