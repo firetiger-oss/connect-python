@@ -10,7 +10,7 @@ def _generate_unary_rpc(
         m.py_name,
         "(self, req: ",
         m.input.py_ident,
-        ", extra_headers: dict[str, str] | None=None) -> ",
+        ", extra_headers: HeaderInput | None=None) -> ",
         m.output.py_ident,
         ":",
     )
@@ -31,14 +31,14 @@ def _generate_server_streaming_rpc(
     """Generate a server streaming RPC with dual API pattern."""
     # Simple iterator method
     g.P("def ", m.py_name, "(")
-    g.P("    self, req: ", m.input.py_ident, ", extra_headers: dict[str, str] | None=None")
+    g.P("    self, req: ", m.input.py_ident, ", extra_headers: HeaderInput | None=None")
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
     g.P("    return self._", m.py_name, "_impl(req, extra_headers)")
     g.P()
 
     # Implementation helper
     g.P("async def _", m.py_name, "_impl(")
-    g.P("    self, req: ", m.input.py_ident, ", extra_headers: dict[str, str] | None=None")
+    g.P("    self, req: ", m.input.py_ident, ", extra_headers: HeaderInput | None=None")
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
     g.set_indent(8)
     g.P("async with await self.", m.py_name, "_stream(req, extra_headers) as stream:")
@@ -51,7 +51,7 @@ def _generate_server_streaming_rpc(
 
     # Stream method for metadata access
     g.P("async def ", m.py_name, "_stream(")
-    g.P("    self, req: ", m.input.py_ident, ", extra_headers: dict[str, str] | None=None")
+    g.P("    self, req: ", m.input.py_ident, ", extra_headers: HeaderInput | None=None")
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
     g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
@@ -71,7 +71,7 @@ def _generate_client_streaming_rpc(
         "    self, reqs: StreamInput[",
         m.input.py_ident,
         "]",
-        ", extra_headers: dict[str, str] | None=None",
+        ", extra_headers: HeaderInput | None=None",
     )
     g.P(") -> ", m.output.py_ident, ":")
     g.set_indent(8)
@@ -93,7 +93,7 @@ def _generate_bidirectional_streaming_rpc(
         "    self, reqs: StreamInput[",
         m.input.py_ident,
         "]",
-        ", extra_headers: dict[str, str] | None=None",
+        ", extra_headers: HeaderInput | None=None",
     )
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
     g.P("    return self._", m.py_name, "_impl(reqs, extra_headers)")
@@ -105,7 +105,7 @@ def _generate_bidirectional_streaming_rpc(
         "    self, reqs: StreamInput[",
         m.input.py_ident,
         "]",
-        ", extra_headers: dict[str, str] | None=None",
+        ", extra_headers: HeaderInput | None=None",
     )
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
     g.set_indent(8)
@@ -123,7 +123,7 @@ def _generate_bidirectional_streaming_rpc(
         "    self, reqs: StreamInput[",
         m.input.py_ident,
         "]",
-        ", extra_headers: dict[str, str] | None=None",
+        ", extra_headers: HeaderInput | None=None",
     )
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
@@ -152,6 +152,7 @@ def generate(gen: protogen.Plugin) -> None:
         g.P()
         g.P("from connectrpc.client import ConnectClient")
         g.P("from connectrpc.client import ConnectProtocol")
+        g.P("from connectrpc.headers import HeaderInput")
         g.P("from connectrpc.streams import StreamInput")
         g.P("from connectrpc.streams import StreamOutput")
         g.P()

@@ -13,6 +13,7 @@ from .client_grpc import ConnectGRPCClient
 from .client_grpc_web import ConnectGRPCWebClient
 from .connect_serialization import CONNECT_JSON_SERIALIZATION
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
+from .headers import HeaderInput
 from .streams import StreamInput
 from .streams import StreamOutput
 
@@ -64,7 +65,7 @@ class ConnectClient:
         url: str,
         req: Message,
         response_type: type[T],
-        extra_headers: dict[str, str] | None = None,
+        extra_headers: HeaderInput | None = None,
     ) -> T:
         return await self._client.call_unary(url, req, response_type, extra_headers=extra_headers)
 
@@ -73,7 +74,7 @@ class ConnectClient:
         url: str,
         reqs: StreamInput[Message],
         response_type: type[T],
-        extra_headers: dict[str, str] | None = None,
+        extra_headers: HeaderInput | None = None,
     ) -> T:
         async_iter = self._to_async_iterator(reqs)
         stream_output = await self._client.call_streaming(
@@ -88,7 +89,7 @@ class ConnectClient:
         url: str,
         req: Message,
         response_type: type[T],
-        extra_headers: dict[str, str] | None = None,
+        extra_headers: HeaderInput | None = None,
     ) -> StreamOutput[T]:
         async def single_req() -> AsyncIterator[Message]:
             yield req
@@ -102,7 +103,7 @@ class ConnectClient:
         url: str,
         reqs: StreamInput[Message],
         response_type: type[T],
-        extra_headers: dict[str, str] | None = None,
+        extra_headers: HeaderInput | None = None,
     ) -> StreamOutput[T]:
         async_iter = self._to_async_iterator(reqs)
         return await self._client.call_streaming(

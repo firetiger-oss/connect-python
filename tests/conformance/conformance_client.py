@@ -5,6 +5,7 @@ import traceback
 
 import aiohttp
 from google.protobuf.any_pb2 import Any
+from multidict import CIMultiDict
 
 from connectrpc.client import ConnectProtocol
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatRequest
@@ -123,8 +124,13 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
         return response
 
 
-def request_headers(req: ClientCompatRequest) -> dict[str, str]:
-    return {h.name: h.value[0] for h in req.request_headers}
+def request_headers(req: ClientCompatRequest) -> CIMultiDict[str]:
+    """Convert protobuf headers to CIMultiDict, preserving all values."""
+    headers = CIMultiDict()
+    for h in req.request_headers:
+        for value in h.value:  # Preserve ALL values, not just the first one
+            headers.add(h.name, value)
+    return headers
 
 
 def error_response(error: ConnectError) -> ClientResponseResult:

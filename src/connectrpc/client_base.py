@@ -4,6 +4,7 @@ from typing import TypeVar
 
 from google.protobuf.message import Message
 
+from .headers import HeaderInput
 from .streams import StreamOutput
 
 T = TypeVar("T", bound=Message)
@@ -15,7 +16,7 @@ class BaseClient(Protocol):
         url: str,
         req: Message,
         response_type: type[T],
-        extra_headers: dict[str, str] | None = None,
+        extra_headers: HeaderInput | None = None,
     ) -> T: ...
 
     async def call_streaming(
@@ -23,5 +24,5 @@ class BaseClient(Protocol):
         url: str,
         reqs: AsyncIterator[Message],
         response_type: type[T],
-        extra_headers: dict[str, str] | None = None,
+        extra_headers: HeaderInput | None = None,
     ) -> StreamOutput[T]: ...

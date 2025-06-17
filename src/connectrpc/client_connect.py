@@ -7,12 +7,15 @@ from typing import TypeVar
 
 import aiohttp
 from google.protobuf.message import Message
+from multidict import CIMultiDict
 
 from .client_base import BaseClient
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .connect_serialization import ConnectSerialization
 from .errors import ConnectError
 from .errors import ConnectProtocolError
+from .headers import HeaderInput
+from .headers import merge_headers
 from .streams import StreamOutput
 from .streams_connect import EndStreamResponse
 
@@ -33,15 +36,16 @@ class ConnectProtocolClient(BaseClient):
         url: str,
         req: Message,
         response_type: type[T],
-        extra_headers: dict[str, str] | None = None,
+        extra_headers: HeaderInput | None = None,
     ) -> T:
         data = self.serde.serialize(req)
-        headers = {
-            "Content-Type": self.serde.unary_content_type,
-            "Connect-Protocol-Version": "1",
-        }
-        if extra_headers is not None:
-            headers.update(extra_headers)
+        headers = CIMultiDict(
+            [
+                ("Content-Type", self.serde.unary_content_type),
+                ("Connect-Protocol-Version", "1"),
+            ]
+        )
+        headers = merge_headers(headers, extra_headers)
 
         async with self._http_client.request("POST", url, data=data, headers=headers) as resp:
             if resp.status != 200:
@@ -61,14 +65,15 @@ class ConnectProtocolClient(BaseClient):
         url: str,
         reqs: AsyncIterator[Message],
         response_type: type[T],
-        extra_headers: dict[str, str] | None = None,
+        extra_headers: HeaderInput | None = None,
     ) -> StreamOutput[T]:
-        headers = {
-            "Content-Type": self.serde.streaming_content_type,
-            "Connect-Protocol-Version": "1",
-        }
-        if extra_headers is not None:
-            headers.update(extra_headers)
+        headers = CIMultiDict(
+            [
+                ("Content-Type", self.serde.streaming_content_type),
+                ("Connect-Protocol-Version", "1"),
+            ]
+        )
+        headers = merge_headers(headers, extra_headers)
 
         async def encoded_stream() -> AsyncIterator[bytes]:
             async for msg in reqs:
