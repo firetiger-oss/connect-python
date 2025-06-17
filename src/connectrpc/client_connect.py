@@ -37,6 +37,7 @@ class ConnectProtocolClient(BaseClient):
         req: Message,
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
     ) -> T:
         data = self.serde.serialize(req)
         headers = CIMultiDict(
@@ -47,7 +48,12 @@ class ConnectProtocolClient(BaseClient):
         )
         headers = merge_headers(headers, extra_headers)
 
-        async with self._http_client.request("POST", url, data=data, headers=headers) as resp:
+        if timeout_seconds is not None:
+            timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+        else:
+            timeout = aiohttp.ClientTimeout(total=None)
+
+        async with self._http_client.request("POST", url, data=data, headers=headers, timeout=timeout) as resp:
             if resp.status != 200:
                 raise await self.unary_error(resp)
 
@@ -66,6 +72,7 @@ class ConnectProtocolClient(BaseClient):
         reqs: AsyncIterator[Message],
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
     ) -> StreamOutput[T]:
         headers = CIMultiDict(
             [
@@ -83,7 +90,12 @@ class ConnectProtocolClient(BaseClient):
 
         payload = aiohttp.AsyncIterablePayload(encoded_stream())
 
-        resp = await self._http_client.request("POST", url, data=payload, headers=headers)
+        if timeout_seconds is not None:
+            timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+        else:
+            timeout = aiohttp.ClientTimeout(total=None)
+
+        resp = await self._http_client.request("POST", url, data=payload, headers=headers, timeout=timeout)
         if resp.status != 200:
             txt = await resp.text()
             raise ConnectError.from_http_response(resp.status, txt)

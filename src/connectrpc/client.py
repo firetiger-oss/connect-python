@@ -66,8 +66,9 @@ class ConnectClient:
         req: Message,
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
     ) -> T:
-        return await self._client.call_unary(url, req, response_type, extra_headers=extra_headers)
+        return await self._client.call_unary(url, req, response_type, extra_headers=extra_headers, timeout_seconds=timeout_seconds)
 
     async def call_client_streaming(
         self,
@@ -75,10 +76,11 @@ class ConnectClient:
         reqs: StreamInput[Message],
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,            
     ) -> T:
         async_iter = self._to_async_iterator(reqs)
         stream_output = await self._client.call_streaming(
-            url, async_iter, response_type, extra_headers=extra_headers
+            url, async_iter, response_type, extra_headers=extra_headers, timeout_seconds=timeout_seconds,
         )
         async for response in stream_output:
             return response
@@ -90,12 +92,13 @@ class ConnectClient:
         req: Message,
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,            
     ) -> StreamOutput[T]:
         async def single_req() -> AsyncIterator[Message]:
             yield req
 
         return await self._client.call_streaming(
-            url, single_req(), response_type, extra_headers=extra_headers
+            url, single_req(), response_type, extra_headers=extra_headers, timeout_seconds=timeout_seconds,
         )
 
     async def call_bidirectional_streaming(
@@ -104,8 +107,9 @@ class ConnectClient:
         reqs: StreamInput[Message],
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,            
     ) -> StreamOutput[T]:
         async_iter = self._to_async_iterator(reqs)
         return await self._client.call_streaming(
-            url, async_iter, response_type, extra_headers=extra_headers
+            url, async_iter, response_type, extra_headers=extra_headers, timeout_seconds=timeout_seconds,
         )
