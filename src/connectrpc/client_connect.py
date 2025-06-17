@@ -11,6 +11,7 @@ from google.protobuf.message import Message
 from .client_base import BaseClient
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .connect_serialization import ConnectSerialization
+from .errors import ConnectError
 from .errors import ConnectProtocolError
 from .streams import StreamOutput
 from .streams_connect import EndStreamResponse
@@ -27,12 +28,21 @@ class ConnectProtocolClient(BaseClient):
         self._http_client = http_client
         self.serde = serialization
 
-    async def call_unary(self, url: str, req: Message, response_type: type[T]) -> T:
+    async def call_unary(
+        self,
+        url: str,
+        req: Message,
+        response_type: type[T],
+        extra_headers: dict[str, str] | None = None,
+    ) -> T:
         data = self.serde.serialize(req)
         headers = {
             "Content-Type": self.serde.unary_content_type,
             "Connect-Protocol-Version": "1",
         }
+        if extra_headers is not None:
+            headers.update(extra_headers)
+
         async with self._http_client.request("POST", url, data=data, headers=headers) as resp:
             if resp.status != 200:
                 raise await self.unary_error(resp)
@@ -47,12 +57,18 @@ class ConnectProtocolClient(BaseClient):
             return response_msg
 
     async def call_streaming(
-        self, url: str, reqs: AsyncIterator[Message], response_type: type[T]
+        self,
+        url: str,
+        reqs: AsyncIterator[Message],
+        response_type: type[T],
+        extra_headers: dict[str, str] | None = None,
     ) -> StreamOutput[T]:
         headers = {
             "Content-Type": self.serde.streaming_content_type,
             "Connect-Protocol-Version": "1",
         }
+        if extra_headers is not None:
+            headers.update(extra_headers)
 
         async def encoded_stream() -> AsyncIterator[bytes]:
             async for msg in reqs:
@@ -64,9 +80,7 @@ class ConnectProtocolClient(BaseClient):
 
         resp = await self._http_client.request("POST", url, data=payload, headers=headers)
         if resp.status != 200:
-            # TODO: this needs more detail
-            await resp.release()
-            raise ConnectProtocolError("got non-200 response code to stream")
+            raise ConnectError.from_http_response(resp.status, resp.text)
 
         if resp.headers["Content-Type"] != self.serde.streaming_content_type:
             await resp.release()
@@ -75,10 +89,9 @@ class ConnectProtocolClient(BaseClient):
             )
         return ConnectStreamOutput(resp, response_type, self.serde)
 
-    async def unary_error(self, resp: aiohttp.ClientResponse) -> Exception:
+    async def unary_error(self, resp: aiohttp.ClientResponse) -> ConnectError:
         txt = await resp.text()
-        # todo: proper exception types
-        return Exception(f"non 200 received, body: {resp}, txt: {txt}")
+        return ConnectError.from_http_response(resp.status, txt)
 
 
 class ConnectStreamOutput(StreamOutput[T]):
@@ -112,7 +125,7 @@ class ConnectStreamOutput(StreamOutput[T]):
                 encoded = await self._response_body.read(-1)
                 end_stream_response = EndStreamResponse.from_bytes(encoded)
                 if end_stream_response.error is not None:
-                    raise ValueError(end_stream_response.error)
+                    raise end_stream_response.error
 
                 self._trailing_metadata = end_stream_response.metadata
                 self._consumed = True

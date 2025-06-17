@@ -10,8 +10,18 @@ T = TypeVar("T", bound=Message)
 
 
 class BaseClient(Protocol):
-    async def call_unary(self, url: str, req: Message, response_type: type[T]) -> T: ...
+    async def call_unary(
+        self,
+        url: str,
+        req: Message,
+        response_type: type[T],
+        extra_headers: dict[str, str] | None = None,
+    ) -> T: ...
 
     async def call_streaming(
-        self, url: str, reqs: AsyncIterator[Message], response_type: type[T]
+        self,
+        url: str,
+        reqs: AsyncIterator[Message],
+        response_type: type[T],
+        extra_headers: dict[str, str] | None = None,
     ) -> StreamOutput[T]: ...

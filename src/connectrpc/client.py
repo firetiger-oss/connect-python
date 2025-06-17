@@ -59,28 +59,52 @@ class ConnectClient:
 
         return _sync_to_async()
 
-    async def call_unary(self, url: str, req: Message, response_type: type[T]) -> T:
-        return await self._client.call_unary(url, req, response_type)
+    async def call_unary(
+        self,
+        url: str,
+        req: Message,
+        response_type: type[T],
+        extra_headers: dict[str, str] | None = None,
+    ) -> T:
+        return await self._client.call_unary(url, req, response_type, extra_headers=extra_headers)
 
     async def call_client_streaming(
-        self, url: str, reqs: StreamInput[Message], response_type: type[T]
+        self,
+        url: str,
+        reqs: StreamInput[Message],
+        response_type: type[T],
+        extra_headers: dict[str, str] | None = None,
     ) -> T:
         async_iter = self._to_async_iterator(reqs)
-        stream_output = await self._client.call_streaming(url, async_iter, response_type)
+        stream_output = await self._client.call_streaming(
+            url, async_iter, response_type, extra_headers=extra_headers
+        )
         async for response in stream_output:
             return response
         raise RuntimeError("No response received from client streaming call")
 
     async def call_server_streaming(
-        self, url: str, req: Message, response_type: type[T]
+        self,
+        url: str,
+        req: Message,
+        response_type: type[T],
+        extra_headers: dict[str, str] | None = None,
     ) -> StreamOutput[T]:
         async def single_req() -> AsyncIterator[Message]:
             yield req
 
-        return await self._client.call_streaming(url, single_req(), response_type)
+        return await self._client.call_streaming(
+            url, single_req(), response_type, extra_headers=extra_headers
+        )
 
     async def call_bidirectional_streaming(
-        self, url: str, reqs: StreamInput[Message], response_type: type[T]
+        self,
+        url: str,
+        reqs: StreamInput[Message],
+        response_type: type[T],
+        extra_headers: dict[str, str] | None = None,
     ) -> StreamOutput[T]:
         async_iter = self._to_async_iterator(reqs)
-        return await self._client.call_streaming(url, async_iter, response_type)
+        return await self._client.call_streaming(
+            url, async_iter, response_type, extra_headers=extra_headers
+        )

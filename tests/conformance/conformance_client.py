@@ -1,18 +1,26 @@
 import asyncio
-import aiohttp
 import struct
 import sys
 import traceback
 
-from connectrpc.client import ConnectProtocol
+import aiohttp
+from google.protobuf.any_pb2 import Any
 
-from connectrpc.conformance.v1.config_pb2 import Protocol
-from connectrpc.conformance.v1.config_pb2 import Codec
+from connectrpc.client import ConnectProtocol
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatRequest
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatResponse
 from connectrpc.conformance.v1.client_compat_pb2 import ClientErrorResult
-from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
+from connectrpc.conformance.v1.client_compat_pb2 import ClientResponseResult
+from connectrpc.conformance.v1.config_pb2 import Code
+from connectrpc.conformance.v1.config_pb2 import Codec
+from connectrpc.conformance.v1.config_pb2 import Protocol
+from connectrpc.conformance.v1.service_pb2 import ClientStreamRequest
+from connectrpc.conformance.v1.service_pb2 import Error
+from connectrpc.conformance.v1.service_pb2 import ServerStreamRequest
 from connectrpc.conformance.v1.service_pb2 import UnaryRequest
+from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
+from connectrpc.errors import ConnectError
+from connectrpc.errors import ConnectErrorCode
 
 
 async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
@@ -37,20 +45,119 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                 protocol=protocol,
             )
 
+            extra_headers = request_headers(request)
+
             if request.method == "Unary":
                 assert len(request.request_messages) == 1
                 req_msg = request.request_messages[0]
                 request_payload = UnaryRequest()
+
                 assert req_msg.Is(request_payload.DESCRIPTOR)
                 req_msg.Unpack(request_payload)
-                server_response = await client.unary(request_payload)
+
+                response = ClientCompatResponse()
+                response.test_name = request.test_name
+                try:
+                    server_response = await client.unary(
+                        request_payload, extra_headers=extra_headers
+                    )
+                    response.response.payloads.append(server_response.payload)
+                except ConnectError as error:
+                    response.response.CopyFrom(error_response(error))
+            elif request.method == "ServerStream":
+                assert len(request.request_messages) == 1
+                req_msg = request.request_messages[0]
+                request_payload = ServerStreamRequest()
+                assert req_msg.Is(request_payload.DESCRIPTOR)
+                req_msg.Unpack(request_payload)
+
+                try:
+                    async for server_msg in client.server_stream(
+                        request_payload, extra_headers=extra_headers
+                    ):
+                        response.response.payloads.append(server_msg.payload)
+
+                except ConnectError as error:
+                    response.response.CopyFrom(error_response(error))
+
+            elif request.method == "ClientStream":
+
+                async def client_requests():
+                    for msg in request.request_messages:
+                        req_payload = ClientStreamRequest()
+                        msg.Unpack(req_payload)
+                        yield req_payload
+
+                try:
+                    server_response = await client.client_stream(
+                        client_requests(), extra_headers=extra_headers
+                    )
+                    response.response.payloads.append(server_response.payload)
+
+                except ConnectError as error:
+                    response.response.CopyFrom(error_response(error))
+
+            elif request.method == "BidiStream":
+
+                async def client_requests():
+                    for msg in request.request_messages:
+                        req_payload = ClientStreamRequest()
+                        msg.Unpack(req_payload)
+                        yield req_payload
+
+                try:
+                    async for server_msg in client.bidi_stream(
+                        client_requests(), extra_headers=extra_headers
+                    ):
+                        response.response.payloads.append(server_msg.payload)
+
+                except ConnectError as error:
+                    response.response.CopyFrom(error_response(error))
+
             else:
-                raise NotImplementedError
+                raise NotImplementedError(f"not implemented: {request.method}")
 
         return response
-    except Exception as e:
+    except Exception:
         response.error.CopyFrom(ClientErrorResult(message=traceback.format_exc()))
         return response
+
+
+def request_headers(req: ClientCompatRequest) -> dict[str, str]:
+    return {h.name: h.value[0] for h in req.request_headers}
+
+
+def error_response(error: ConnectError) -> ClientResponseResult:
+    details: list[Any] = []
+    if isinstance(error.details, list):
+        for d in error.details:
+            v = Any()
+            v.Pack(d.message())
+            details.append(v)
+
+    code = {
+        ConnectErrorCode.CANCELED: Code.CODE_CANCELED,
+        ConnectErrorCode.UNKNOWN: Code.CODE_UNKNOWN,
+        ConnectErrorCode.INVALID_ARGUMENT: Code.CODE_INVALID_ARGUMENT,
+        ConnectErrorCode.DEADLINE_EXCEEDED: Code.CODE_DEADLINE_EXCEEDED,
+        ConnectErrorCode.NOT_FOUND: Code.CODE_NOT_FOUND,
+        ConnectErrorCode.ALREADY_EXISTS: Code.CODE_ALREADY_EXISTS,
+        ConnectErrorCode.PERMISSION_DENIED: Code.CODE_PERMISSION_DENIED,
+        ConnectErrorCode.RESOURCE_EXHAUSTED: Code.CODE_RESOURCE_EXHAUSTED,
+        ConnectErrorCode.FAILED_PRECONDITION: Code.CODE_FAILED_PRECONDITION,
+        ConnectErrorCode.ABORTED: Code.CODE_ABORTED,
+        ConnectErrorCode.OUT_OF_RANGE: Code.CODE_OUT_OF_RANGE,
+        ConnectErrorCode.UNIMPLEMENTED: Code.CODE_UNIMPLEMENTED,
+        ConnectErrorCode.INTERNAL: Code.CODE_INTERNAL,
+        ConnectErrorCode.UNAVAILABLE: Code.CODE_UNAVAILABLE,
+        ConnectErrorCode.DATA_LOSS: Code.CODE_DATA_LOSS,
+        ConnectErrorCode.UNAUTHENTICATED: Code.CODE_UNAUTHENTICATED,
+    }[error.code]
+
+    err = Error(code=code, message=error.message, details=details)
+    return ClientResponseResult(
+        error=err,
+    )
 
 
 def read_size_delimited_message():

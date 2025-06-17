@@ -79,6 +79,7 @@ disable_error_code = ["union-attr"]
 target-version = "py310"
 line-length = 100
 src = ["src", "tests"]
+exclude = ["tests/conformance/connectrpc"]
 
 [tool.ruff.lint]
 select = [

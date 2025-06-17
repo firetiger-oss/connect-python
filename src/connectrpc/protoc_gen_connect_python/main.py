@@ -3,7 +3,7 @@ import sys
 try:
     import protogen
 
-    from connectrpc.generator.generator import generate
+    from connectrpc.generator import generate
 except ImportError as e:
     print(
         "Error: Missing compiler dependencies. Install with: pip install connect-python[compiler]",
