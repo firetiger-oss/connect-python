@@ -17,6 +17,7 @@ from connectrpc.conformance.v1.config_pb2 import Codec
 from connectrpc.conformance.v1.config_pb2 import Protocol
 from connectrpc.conformance.v1.service_pb2 import ClientStreamRequest
 from connectrpc.conformance.v1.service_pb2 import Error
+from connectrpc.conformance.v1.service_pb2 import Header
 from connectrpc.conformance.v1.service_pb2 import ServerStreamRequest
 from connectrpc.conformance.v1.service_pb2 import UnaryRequest
 from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
@@ -65,6 +66,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     response.response.payloads.append(server_response.payload)
                 except ConnectError as error:
                     response.response.CopyFrom(error_response(error))
+
             elif request.method == "ServerStream":
                 assert len(request.request_messages) == 1
                 req_msg = request.request_messages[0]
@@ -73,10 +75,15 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                 req_msg.Unpack(request_payload)
 
                 try:
-                    async for server_msg in client.server_stream(
+                    response_stream = await client.server_stream_stream(
                         request_payload, extra_headers=extra_headers
-                    ):
+                    )
+                    async for server_msg in response_stream:
                         response.response.payloads.append(server_msg.payload)
+
+                    resp_headers = multidict_to_proto(response_stream.response_headers())
+                    print(f"cast headers:  {resp_headers}", file=sys.stderr)
+                    response.response.response_headers.extend(resp_headers)
 
                 except ConnectError as error:
                     response.response.CopyFrom(error_response(error))
@@ -107,10 +114,15 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         yield req_payload
 
                 try:
-                    async for server_msg in client.bidi_stream(
+                    response_stream = await client.bidi_stream_stream(
                         client_requests(), extra_headers=extra_headers
-                    ):
+                    )
+
+                    async for server_msg in response_stream:
                         response.response.payloads.append(server_msg.payload)
+
+                    resp_headers = multidict_to_proto(response_stream.response_headers())
+                    response.response.response_headers.extend(resp_headers)
 
                 except ConnectError as error:
                     response.response.CopyFrom(error_response(error))
@@ -131,6 +143,13 @@ def request_headers(req: ClientCompatRequest) -> CIMultiDict[str]:
         for value in h.value:  # Preserve ALL values, not just the first one
             headers.add(h.name, value)
     return headers
+
+
+def multidict_to_proto(headers: CIMultiDict) -> list[Header]:
+    result = []
+    for k in headers:
+        result.append(Header(name=k, value=headers.getall(k)))
+    return result
 
 
 def error_response(error: ConnectError) -> ClientResponseResult:

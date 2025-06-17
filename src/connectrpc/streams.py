@@ -7,6 +7,7 @@ from typing import Protocol
 from typing import TypeVar
 
 from google.protobuf.message import Message
+from multidict import MultiDict
 from typing_extensions import Self
 
 T = TypeVar("T", bound=Message)
@@ -74,6 +75,8 @@ class StreamOutput(Protocol[U]):
     def __aiter__(self) -> AsyncIterator[U]:
         """Return async iterator for the stream messages."""
         ...
+
+    def response_headers(self) -> MultiDict: ...
 
     def trailing_metadata(self) -> dict[str, Any] | None:
         """Get trailing metadata after stream is fully consumed.

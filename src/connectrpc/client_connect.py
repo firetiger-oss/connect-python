@@ -85,7 +85,8 @@ class ConnectProtocolClient(BaseClient):
 
         resp = await self._http_client.request("POST", url, data=payload, headers=headers)
         if resp.status != 200:
-            raise ConnectError.from_http_response(resp.status, resp.text)
+            txt = await resp.text()
+            raise ConnectError.from_http_response(resp.status, txt)
 
         if resp.headers["Content-Type"] != self.serde.streaming_content_type:
             await resp.release()
@@ -112,6 +113,7 @@ class ConnectStreamOutput(StreamOutput[T]):
         self._response_body = response.content
         self._response_type = response_type
         self._serde = serde
+        self._response_headers = CIMultiDict(response.headers)  # Capture HTTP response headers
         self._trailing_metadata: dict[str, Any] | None = None
         self._consumed = False
         self._released = False
@@ -149,6 +151,10 @@ class ConnectStreamOutput(StreamOutput[T]):
 
     def __aiter__(self) -> AsyncIterator[T]:
         return self
+
+    def response_headers(self) -> CIMultiDict[str]:
+        """Get HTTP response headers from the initial response."""
+        return CIMultiDict(self._response_headers)  # Return copy to avoid mutation
 
     def trailing_metadata(self) -> dict[str, Any] | None:
         if not self._consumed:
