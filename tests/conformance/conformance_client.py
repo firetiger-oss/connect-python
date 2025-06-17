@@ -129,9 +129,6 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         yield req_payload
 
                 try:
-                    import sys
-                    print("timeout is: ", request.timeout_ms, file=sys.stderr)
-                    print("sleep is: ", request.request_delay_ms, file=sys.stderr)                    
                     stream_output = await client.bidi_stream_stream(
                         client_requests(),
                         extra_headers=extra_headers,
