@@ -82,8 +82,12 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         response.response.payloads.append(server_msg.payload)
 
                     resp_headers = multidict_to_proto(response_stream.response_headers())
-                    print(f"cast headers:  {resp_headers}", file=sys.stderr)
                     response.response.response_headers.extend(resp_headers)
+
+                    resp_trailers = response_stream.trailing_metadata()
+                    if resp_trailers is not None:
+                        resp_trailers_proto = [Header(name=k, value=v) for k, v in resp_trailers.items()]
+                        response.response.response_trailers.extend(resp_trailers_proto)
 
                 except ConnectError as error:
                     response.response.CopyFrom(error_response(error))
@@ -123,6 +127,11 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
                     resp_headers = multidict_to_proto(response_stream.response_headers())
                     response.response.response_headers.extend(resp_headers)
+
+                    resp_trailers = response_stream.trailing_metadata()
+                    if resp_trailers is not None:
+                        resp_trailers_proto = [Header(name=k, value=v) for k, v in resp_trailers.items()]
+                        response.response.response_trailers.extend(resp_trailers_proto)
 
                 except ConnectError as error:
                     response.response.CopyFrom(error_response(error))
