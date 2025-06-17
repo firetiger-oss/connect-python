@@ -30,14 +30,14 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "aiohttp>=3.12.12",
-    "multidict>=6.4.4",
-    "protobuf>=6.31.1",
+    "aiohttp>=3.1", # 3.1 adds AsyncIterablePayload, which we need
+    "multidict",
+    "protobuf",
 ]
 
 [project.optional-dependencies]
 compiler = [
-    "protogen>=0.3.1",
+    "protogen>=0.3",
 ]
 dev = [
     "pytest>=7.0.0",
