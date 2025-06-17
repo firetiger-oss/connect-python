@@ -104,7 +104,8 @@ class ConnectProtocolClient(BaseClient):
 
         payload = aiohttp.AsyncIterablePayload(encoded_stream())
 
-        if timeout_seconds is not None:
+        if timeout_seconds is not None and timeout_seconds > 0:
+            headers["Connect-Timeout-Ms"] = str(int(timeout_seconds / 1000))
             timeout = aiohttp.ClientTimeout(total=timeout_seconds)
         else:
             timeout = aiohttp.ClientTimeout(total=None)
