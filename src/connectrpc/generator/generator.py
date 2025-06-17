@@ -7,7 +7,7 @@ def _generate_unary_rpc(
     """Generate a unary RPC method."""
     g.P("async def ", m.py_name, "(self, req: ", m.input.py_ident, ") -> ", m.output.py_ident, ":")
     g.set_indent(8)
-    g.P('url = self.base_url + "/', f.proto.package, ".", s.py_ident, "/", m.proto.name, '"')
+    g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P("return await self._connect_client.call_unary(url, req, ", m.output.py_ident, ")")
     g.set_indent(4)
     g.P()
@@ -42,7 +42,7 @@ def _generate_server_streaming_rpc(
     g.P("    self, req: ", m.input.py_ident)
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
-    g.P('url = self.base_url + "/', f.proto.package, ".", s.py_ident, "/", m.proto.name, '"')
+    g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P("return await self._connect_client.call_server_streaming(")
     g.P("    url, req, ", m.output.py_ident)
     g.P(")")
@@ -58,7 +58,7 @@ def _generate_client_streaming_rpc(
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "]")
     g.P(") -> ", m.output.py_ident, ":")
     g.set_indent(8)
-    g.P('url = self.base_url + "/', f.proto.package, ".", s.py_ident, "/", m.proto.name, '"')
+    g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P("return await self._connect_client.call_client_streaming(")
     g.P("    url, reqs, ", m.output.py_ident)
     g.P(")")
@@ -95,7 +95,7 @@ def _generate_bidirectional_streaming_rpc(
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "]")
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
-    g.P('url = self.base_url + "/', f.proto.package, ".", s.py_ident, "/", m.proto.name, '"')
+    g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P("return await self._connect_client.call_bidirectional_streaming(")
     g.P("    url, reqs, ", m.output.py_ident)
     g.P(")")
@@ -108,9 +108,10 @@ def generate(gen: protogen.Plugin) -> None:
         if len(f.services) == 0:
             continue
 
+        import_path = protogen.PyImportPath(f.py_import_path._path + "_connect")
         g = gen.new_generated_file(
             f.proto.name.replace(".proto", "_pb2_connect.py"),
-            f.py_import_path,
+            import_path,
         )
         g.P("# Generated Connect client code")
         g.P()
@@ -126,7 +127,7 @@ def generate(gen: protogen.Plugin) -> None:
         g.P()
 
         for s in f.services:
-            g.P("class ", s.py_ident, "Client:")
+            g.P("class ", protogen.PyIdent(import_path, s.proto.name), "Client:")
             g.set_indent(4)
             g.P("def __init__(")
             g.P("    self,")
@@ -155,3 +156,13 @@ def generate(gen: protogen.Plugin) -> None:
 
             g.set_indent(0)
             g.P()
+
+def gather_message_types(g: protogen.GeneratedFile, f: protogen.File) -> list[protogen.Message]:
+    result: list[protogen.Message] = []
+    for svc in f.services:
+        for method in svc.methods:
+            result.append(method.input)
+            result.append(method.output)
+    return result
+
+
