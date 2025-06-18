@@ -67,9 +67,10 @@ warn_unreachable = true
 warn_unused_ignores = true
 show_error_codes = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = "connectrpc.generator.generator"
+module = "connectrpc.generator"
 strict = false
 check_untyped_defs = false
 disallow_untyped_calls = false

@@ -1,6 +1,6 @@
 # Run mypy type checking
 mypy:
-    mypy src tests examples
+    mypy --package connectrpc && mypy tests examples
 
 # Format code with ruff
 format:
