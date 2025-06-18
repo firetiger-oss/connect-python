@@ -94,13 +94,11 @@ class ConnectProtocolClient(BaseClient):
             ]
         )
         headers = merge_headers(headers, extra_headers)
-        debug("calling streaming with headers: ", headers)
 
         async def encoded_stream() -> AsyncIterator[bytes]:
             async for msg in reqs:
                 encoded = self.serde.serialize(msg)
                 envelope = struct.pack(">BI", 0, len(encoded))
-                debug("sending message (length: ", len(encoded), ")")
                 yield envelope + encoded
 
         payload = aiohttp.AsyncIterablePayload(encoded_stream())
@@ -114,20 +112,18 @@ class ConnectProtocolClient(BaseClient):
         http_response = await self._http_client.request(
             "POST", url, data=payload, headers=headers, timeout=timeout
         )
-        debug("received headers")
         if http_response.headers["Content-Type"] != self.serde.streaming_content_type:
             await http_response.release()
             raise ConnectProtocolError(
                 f"got unexpected Content-Type in response: {http_response.headers['Content-Type']}"
             )
 
-        debug("")
-        debug("called HTTP, got raw_headers: ", http_response.raw_headers)
-        debug("")
         stream_output = ConnectStreamOutput(http_response, response_type, self.serde)
         if http_response.status != 200:
             txt = await http_response.text()
-            stream_output._abort_with_error(ConnectError.from_http_response(http_response.status, txt))
+            stream_output._abort_with_error(
+                ConnectError.from_http_response(http_response.status, txt)
+            )
         return stream_output
 
     async def unary_error(self, resp: aiohttp.ClientResponse) -> ConnectError:
@@ -200,14 +196,14 @@ class ConnectStreamOutput(StreamOutput[T]):
             # This is an EndStreamResponse
             encoded = await self._response_body.read(-1)
             end_stream_response = EndStreamResponse.from_bytes(encoded)
-            self._trailing_metadata = end_stream_response.metadata
-            self._consumed = True
-
-            # Stream is now complete - release connection before StopAsyncIteration
-            await self.close()
 
             if end_stream_response.error is not None:
                 self._error = end_stream_response.error
+
+            self._trailing_metadata = end_stream_response.metadata
+            self._consumed = True
+            # Stream is now complete - release connection before StopAsyncIteration
+            await self.close()
 
             raise StopAsyncIteration
 
@@ -254,7 +250,7 @@ class ConnectStreamOutput(StreamOutput[T]):
         return self._consumed
 
     def error(self) -> ConnectError | None:
-        return None
+        return self._error
 
 
 class ConnectPartialUnaryResponse(Exception):
@@ -264,5 +260,5 @@ class ConnectPartialUnaryResponse(Exception):
 
 
 def debug(*args):
-    import sys
+    pass
     # print(*args, file=sys.stderr)

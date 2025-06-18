@@ -13,7 +13,6 @@ from multidict import CIMultiDict
 from connectrpc.client import ConnectProtocol
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatRequest
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatResponse
-from connectrpc.conformance.v1.client_compat_pb2 import ClientErrorResult
 from connectrpc.conformance.v1.client_compat_pb2 import ClientResponseResult
 from connectrpc.conformance.v1.config_pb2 import Code
 from connectrpc.conformance.v1.config_pb2 import Codec
@@ -33,7 +32,7 @@ from connectrpc.unary import UnaryOutput
 
 
 def debug(*args, **kwargs):
-    #print(*args, **kwargs, file=sys.stderr)
+    # print(*args, **kwargs, file=sys.stderr)
     pass
 
 
@@ -106,6 +105,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         msg.Unpack(req_payload)
                         await asyncio.sleep(request.request_delay_ms / 1000.0)
                         yield req_payload
+
                 stream_output = await client.call_client_stream(
                     client_requests(),
                     extra_headers=extra_headers,

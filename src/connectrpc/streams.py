@@ -92,7 +92,7 @@ class StreamOutput(Protocol[U]):
         ...
 
     def done(self) -> bool:
-        """Returns true when the stream has been fully consumed. """
+        """Returns true when the stream has been fully consumed."""
         ...
 
     def error(self) -> ConnectError | None:

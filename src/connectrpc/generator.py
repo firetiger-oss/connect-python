@@ -16,7 +16,8 @@ common_args_str = ", ".join(common_args)
 
 
 def docstring(g: protogen.GeneratedFile, *args):
-    g.P("\"\"\"", *args, "\"\"\"")
+    g.P('"""', *args, '"""')
+
 
 def _generate_unary_rpc(
     g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method
@@ -26,7 +27,9 @@ def _generate_unary_rpc(
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
     g.P(") -> UnaryOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
-    docstring(g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata")
+    docstring(
+        g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata"
+    )
     g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P(
         "return await self._connect_client.call_unary(url, req, ",
@@ -76,8 +79,10 @@ def _generate_server_streaming_rpc(
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
-    docstring(g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata")
-    g.set_indent(4)    
+    docstring(
+        g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata"
+    )
+    g.set_indent(4)
     g.P('    url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P("    return await self._connect_client.call_server_streaming(")
     g.P("        url, req, ", m.output.py_ident, ", ", common_args_str)
@@ -93,8 +98,10 @@ def _generate_client_streaming_rpc(
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str)
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
-    docstring(g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata")
-    g.set_indent(4)    
+    docstring(
+        g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata"
+    )
+    g.set_indent(4)
     g.P('    url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P("    return await self._connect_client.call_client_streaming(")
     g.P("        url, reqs, ", m.output.py_ident, ", ", common_args_str)
@@ -111,7 +118,6 @@ def _generate_client_streaming_rpc(
     g.P("        async for response in stream:")
     g.P("            return response")
     g.P()
-
 
 
 def _generate_bidirectional_streaming_rpc(
@@ -147,8 +153,10 @@ def _generate_bidirectional_streaming_rpc(
     )
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
-    docstring(g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata")
-    g.set_indent(4)    
+    docstring(
+        g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata"
+    )
+    g.set_indent(4)
     g.P('    url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P("    return await self._connect_client.call_bidirectional_streaming(")
     g.P("        url, reqs, ", m.output.py_ident, ", ", common_args_str)
