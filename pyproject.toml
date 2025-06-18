@@ -77,6 +77,18 @@ disallow_untyped_calls = false
 warn_return_any = false
 disable_error_code = ["union-attr"]
 
+[[tool.mypy.overrides]]
+module = "connectrpc.conformance.v1.service_pb2"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "connectrpc.conformance.v1.client_compat_pb2"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "connectrpc.conformance.v1.config_pb2"
+ignore_errors = true
+
 [tool.ruff]
 target-version = "py310"
 line-length = 100

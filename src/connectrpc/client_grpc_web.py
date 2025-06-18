@@ -22,6 +22,7 @@ class ConnectGRPCWebClient(BaseClient):
         req: Message,
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
     ) -> UnaryOutput[T]:
         raise NotImplementedError
 
@@ -31,5 +32,6 @@ class ConnectGRPCWebClient(BaseClient):
         reqs: AsyncIterator[Message],
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
     ) -> StreamOutput[T]:
         raise NotImplementedError

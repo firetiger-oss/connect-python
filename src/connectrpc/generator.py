@@ -15,7 +15,7 @@ common_args = [
 common_args_str = ", ".join(common_args)
 
 
-def docstring(g: protogen.GeneratedFile, *args):
+def docstring(g: protogen.GeneratedFile, *args: str) -> None:
     g.P('"""', *args, '"""')
 
 
@@ -45,9 +45,13 @@ def _generate_unary_rpc(
     g.P(") -> ", m.output.py_ident, ":")
     g.set_indent(8)
     g.P("response = await self.call_", m.py_name, "(req, ", common_args_str, ")")
-    g.P("if response.error() is not None:")
-    g.P("    raise response.error()")
-    g.P("return response.message()")
+    g.P("err = response.error()")
+    g.P("if err is not None:")
+    g.P("    raise err")
+    g.P("msg = response.message()")
+    g.P("if msg is None:")
+    g.P("    raise ConnectProtocolError('missing response message')")
+    g.P("return msg")
     g.set_indent(4)
     g.P()
 
@@ -68,9 +72,10 @@ def _generate_server_streaming_rpc(
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
     g.P("    stream_output = await self.call_", m.py_name, "(req, extra_headers)")
-    g.P("    if stream_output.error() is not None:")
-    g.P("        raise stream_output.error()")
-    g.P("    async with await stream_output as stream:")
+    g.P("    err = stream_output.error()")
+    g.P("    if err is not None:")
+    g.P("        raise err")
+    g.P("    async with stream_output as stream:")
     g.P("        async for response in stream:")
     g.P("            yield response")
     g.P()
@@ -111,12 +116,14 @@ def _generate_client_streaming_rpc(
     g.P("async def ", m.py_name, "(")
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str)
     g.P(") -> ", m.output.py_ident, ":")
-    g.P("    stream_output = await self.call_", m.py_name, "(req, extra_headers)")
-    g.P("    if stream_output.error() is not None:")
-    g.P("        raise stream_output.error()")
-    g.P("    async with await stream_output as stream:")
+    g.P("    stream_output = await self.call_", m.py_name, "(reqs, extra_headers)")
+    g.P("    err = stream_output.error()")
+    g.P("    if err is not None:")
+    g.P("        raise err")
+    g.P("    async with stream_output as stream:")
     g.P("        async for response in stream:")
     g.P("            return response")
+    g.P("    raise ConnectProtocolError('no response message received')")
     g.P()
 
 
@@ -136,9 +143,10 @@ def _generate_bidirectional_streaming_rpc(
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str)
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
     g.P("    stream_output = await self.call_", m.py_name, "(reqs, ", common_args_str, ")")
-    g.P("    if stream_output.error() is not None:")
-    g.P("        raise stream_output.error()")
-    g.P("    async with await stream_output as stream:")
+    g.P("    err = stream_output.error()")
+    g.P("    if err is not None:")
+    g.P("        raise err")
+    g.P("    async with stream_output as stream:")
     g.P("        async for response in stream:")
     g.P("            yield response")
     g.P()
@@ -181,6 +189,7 @@ def generate(gen: protogen.Plugin) -> None:
         g.P()
         g.P("from connectrpc.client import ConnectClient")
         g.P("from connectrpc.client import ConnectProtocol")
+        g.P("from connectrpc.client_connect import ConnectProtocolError")
         g.P("from connectrpc.headers import HeaderInput")
         g.P("from connectrpc.streams import StreamInput")
         g.P("from connectrpc.streams import StreamOutput")
@@ -225,6 +234,8 @@ def gather_message_types(g: protogen.GeneratedFile, f: protogen.File) -> list[pr
     result: list[protogen.Message] = []
     for svc in f.services:
         for method in svc.methods:
+            assert method.input is not None
+            assert method.output is not None
             result.append(method.input)
             result.append(method.output)
     return result

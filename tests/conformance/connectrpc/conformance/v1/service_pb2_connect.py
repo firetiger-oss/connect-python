@@ -5,6 +5,7 @@ import aiohttp
 
 from connectrpc.client import ConnectClient
 from connectrpc.client import ConnectProtocol
+from connectrpc.client_connect import ConnectProtocolError
 from connectrpc.headers import HeaderInput
 from connectrpc.streams import StreamInput
 from connectrpc.streams import StreamOutput
@@ -33,9 +34,13 @@ class ConformanceServiceClient:
         self, req: connectrpc.conformance.v1.service_pb2.UnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> connectrpc.conformance.v1.service_pb2.UnaryResponse:
         response = await self.call_unary(req, extra_headers, timeout_seconds)
-        if response.error() is not None:
-            raise response.error()
-        return response.message()
+        err = response.error()
+        if err is not None:
+            raise err
+        msg = response.message()
+        if msg is None:
+            raise ConnectProtocolError('missing response message')
+        return msg
 
     def server_stream(
         self, req: connectrpc.conformance.v1.service_pb2.ServerStreamRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -46,9 +51,10 @@ class ConformanceServiceClient:
         self, req: connectrpc.conformance.v1.service_pb2.ServerStreamRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> AsyncIterator[connectrpc.conformance.v1.service_pb2.ServerStreamResponse]:
         stream_output = await self.call_server_stream(req, extra_headers)
-        if stream_output.error() is not None:
-            raise stream_output.error()
-        async with await stream_output as stream:
+        err = stream_output.error()
+        if err is not None:
+            raise err
+        async with stream_output as stream:
             async for response in stream:
                 yield response
 
@@ -73,12 +79,14 @@ class ConformanceServiceClient:
     async def client_stream(
         self, reqs: StreamInput[connectrpc.conformance.v1.service_pb2.ClientStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> connectrpc.conformance.v1.service_pb2.ClientStreamResponse:
-        stream_output = await self.call_client_stream(req, extra_headers)
-        if stream_output.error() is not None:
-            raise stream_output.error()
-        async with await stream_output as stream:
+        stream_output = await self.call_client_stream(reqs, extra_headers)
+        err = stream_output.error()
+        if err is not None:
+            raise err
+        async with stream_output as stream:
             async for response in stream:
                 return response
+        raise ConnectProtocolError('no response message received')
 
     def bidi_stream(
         self, reqs: StreamInput[connectrpc.conformance.v1.service_pb2.BidiStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -89,9 +97,10 @@ class ConformanceServiceClient:
         self, reqs: StreamInput[connectrpc.conformance.v1.service_pb2.BidiStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> AsyncIterator[connectrpc.conformance.v1.service_pb2.BidiStreamResponse]:
         stream_output = await self.call_bidi_stream(reqs, extra_headers, timeout_seconds)
-        if stream_output.error() is not None:
-            raise stream_output.error()
-        async with await stream_output as stream:
+        err = stream_output.error()
+        if err is not None:
+            raise err
+        async with stream_output as stream:
             async for response in stream:
                 yield response
 
@@ -115,9 +124,13 @@ class ConformanceServiceClient:
         self, req: connectrpc.conformance.v1.service_pb2.UnimplementedRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> connectrpc.conformance.v1.service_pb2.UnimplementedResponse:
         response = await self.call_unimplemented(req, extra_headers, timeout_seconds)
-        if response.error() is not None:
-            raise response.error()
-        return response.message()
+        err = response.error()
+        if err is not None:
+            raise err
+        msg = response.message()
+        if msg is None:
+            raise ConnectProtocolError('missing response message')
+        return msg
 
     async def call_idempotent_unary(
         self, req: connectrpc.conformance.v1.service_pb2.IdempotentUnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -130,7 +143,11 @@ class ConformanceServiceClient:
         self, req: connectrpc.conformance.v1.service_pb2.IdempotentUnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> connectrpc.conformance.v1.service_pb2.IdempotentUnaryResponse:
         response = await self.call_idempotent_unary(req, extra_headers, timeout_seconds)
-        if response.error() is not None:
-            raise response.error()
-        return response.message()
+        err = response.error()
+        if err is not None:
+            raise err
+        msg = response.message()
+        if msg is None:
+            raise ConnectProtocolError('missing response message')
+        return msg
 

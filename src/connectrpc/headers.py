@@ -7,12 +7,14 @@ while maintaining backward compatibility with simple dict usage.
 from __future__ import annotations
 
 from multidict import CIMultiDict
+from multidict import MultiDict
 
 # Type definitions for header inputs - what users can pass
 HeaderInput = (
     dict[str, str]  # Simple dict (most common case)
     | dict[str, list[str]]  # Multi-valued dict
     | CIMultiDict[str]  # Full multidict support
+    | MultiDict[str]
 )
 
 # Internal type used throughout the client stack
@@ -35,7 +37,7 @@ def normalize_headers(input_headers: HeaderInput | None) -> HeadersInternal:
         # Already in the right format, return copy to avoid mutation
         return CIMultiDict(input_headers)
 
-    result = CIMultiDict()
+    result: CIMultiDict[str] = CIMultiDict()
 
     if isinstance(input_headers, dict):
         for key, value in input_headers.items():

@@ -2,13 +2,15 @@ import asyncio
 import struct
 import sys
 import traceback
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import aiohttp
 
 # Imported for their side effects of loading protobuf registry
 import google.protobuf.descriptor_pb2  # noqa: F401
-from google.protobuf.any_pb2 import Any
-from multidict import CIMultiDict
+from google.protobuf.any_pb2 import Any as ProtoAny
+from multidict import MultiDict
 
 from connectrpc.client import ConnectProtocol
 from connectrpc.client_connect import UnexpectedContentType
@@ -19,12 +21,17 @@ from connectrpc.conformance.v1.config_pb2 import Code
 from connectrpc.conformance.v1.config_pb2 import Codec
 from connectrpc.conformance.v1.config_pb2 import Protocol
 from connectrpc.conformance.v1.service_pb2 import BidiStreamRequest
+from connectrpc.conformance.v1.service_pb2 import BidiStreamResponse
 from connectrpc.conformance.v1.service_pb2 import ClientStreamRequest
+from connectrpc.conformance.v1.service_pb2 import ClientStreamResponse
 from connectrpc.conformance.v1.service_pb2 import Error
 from connectrpc.conformance.v1.service_pb2 import Header
 from connectrpc.conformance.v1.service_pb2 import ServerStreamRequest
+from connectrpc.conformance.v1.service_pb2 import ServerStreamResponse
 from connectrpc.conformance.v1.service_pb2 import UnaryRequest
+from connectrpc.conformance.v1.service_pb2 import UnaryResponse
 from connectrpc.conformance.v1.service_pb2 import UnimplementedRequest
+from connectrpc.conformance.v1.service_pb2 import UnimplementedResponse
 from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
@@ -32,7 +39,7 @@ from connectrpc.streams import StreamOutput
 from connectrpc.unary import UnaryOutput
 
 
-def debug(*args, **kwargs):
+def debug(*args: Any) -> None:
     # print(*args, **kwargs, file=sys.stderr)
     pass
 
@@ -64,6 +71,19 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
             )
 
             extra_headers = request_headers(request)
+            request_payload: (
+                UnaryRequest
+                | ServerStreamRequest
+                | ClientStreamRequest
+                | BidiStreamRequest
+                | UnimplementedRequest
+            )
+            stream_output: (
+                StreamOutput[ClientStreamResponse]
+                | StreamOutput[ServerStreamResponse]
+                | StreamOutput[BidiStreamResponse]
+            )
+            server_response: UnaryOutput[UnaryResponse] | UnaryOutput[UnimplementedResponse]
 
             if request.method == "Unary":
                 assert len(request.request_messages) == 1
@@ -100,7 +120,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
             elif request.method == "ClientStream":
 
-                async def client_requests():
+                async def client_stream_requests() -> AsyncGenerator[ClientStreamRequest]:
                     for msg in request.request_messages:
                         req_payload = ClientStreamRequest()
                         msg.Unpack(req_payload)
@@ -108,7 +128,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         yield req_payload
 
                 stream_output = await client.call_client_stream(
-                    client_requests(),
+                    client_stream_requests(),
                     extra_headers=extra_headers,
                     timeout_seconds=timeout_seconds,
                 )
@@ -117,7 +137,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
             elif request.method == "BidiStream":
 
-                async def client_requests():
+                async def client_bidi_requests() -> AsyncGenerator[BidiStreamRequest]:
                     for msg in request.request_messages:
                         req_payload = BidiStreamRequest()
                         msg.Unpack(req_payload)
@@ -125,7 +145,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         yield req_payload
 
                 stream_output = await client.call_bidi_stream(
-                    client_requests(),
+                    client_bidi_requests(),
                     extra_headers=extra_headers,
                     timeout_seconds=timeout_seconds,
                 )
@@ -162,7 +182,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
         return response
 
 
-async def result_from_stream_output(stream_output: StreamOutput) -> ClientResponseResult:
+async def result_from_stream_output(stream_output: StreamOutput[Any]) -> ClientResponseResult:
     result = ClientResponseResult()
     async with stream_output as stream:
         async for server_msg in stream:
@@ -176,21 +196,26 @@ async def result_from_stream_output(stream_output: StreamOutput) -> ClientRespon
         resp_trailers_proto = [Header(name=k, value=v) for k, v in resp_trailers.items()]
         result.response_trailers.extend(resp_trailers_proto)
 
-    if stream_output.error() is not None:
-        result.error.CopyFrom(exception_to_proto(stream_output.error()))
+    err = stream_output.error()
+    if err is not None:
+        result.error.CopyFrom(exception_to_proto(err))
 
     return result
 
 
-def result_from_unary_output(unary_output: UnaryOutput) -> ClientResponseResult:
+def result_from_unary_output(unary_output: UnaryOutput[Any]) -> ClientResponseResult:
     result = ClientResponseResult()
-    if unary_output.error() is not None:
-        result.error.CopyFrom(exception_to_proto(unary_output.error()))
-    if unary_output.message() is not None:
-        result.payloads.append(unary_output.message().payload)
+    err = unary_output.error()
+    if err is not None:
+        result.error.CopyFrom(exception_to_proto(err))
+    msg = unary_output.message()
+    if msg is not None:
+        result.payloads.append(msg.payload)
 
-    resp_headers = multidict_to_proto(unary_output.response_headers())
-    result.response_headers.extend(resp_headers)
+    headers = unary_output.response_headers()
+    if headers is not None:
+        headers_proto = multidict_to_proto(headers)
+        result.response_headers.extend(headers_proto)
 
     resp_trailers = unary_output.response_trailers()
     if resp_trailers is not None:
@@ -200,16 +225,16 @@ def result_from_unary_output(unary_output: UnaryOutput) -> ClientResponseResult:
     return result
 
 
-def request_headers(req: ClientCompatRequest) -> CIMultiDict[str]:
+def request_headers(req: ClientCompatRequest) -> MultiDict[str]:
     """Convert protobuf headers to CIMultiDict, preserving all values."""
-    headers = CIMultiDict()
+    headers: MultiDict[str] = MultiDict()
     for h in req.request_headers:
         for value in h.value:  # Preserve ALL values, not just the first one
             headers.add(h.name, value)
     return headers
 
 
-def multidict_to_proto(headers: CIMultiDict) -> list[Header]:
+def multidict_to_proto(headers: MultiDict[str]) -> list[Header]:
     result = []
     for k in headers:
         result.append(Header(name=k, value=headers.getall(k)))
@@ -227,10 +252,10 @@ def exception_to_proto(error: Exception) -> Error:
         tb = traceback.format_tb(error.__traceback__)
         error = ConnectError(ConnectErrorCode.INTERNAL, str(tb))
 
-    details: list[Any] = []
+    details: list[ProtoAny] = []
     if isinstance(error.details, list):
         for d in error.details:
-            v = Any()
+            v = ProtoAny()
             v.Pack(d.message())
             details.append(v)
 
@@ -256,7 +281,7 @@ def exception_to_proto(error: Exception) -> Error:
     return Error(code=code, message=error.message, details=details)
 
 
-def read_size_delimited_message():
+def read_size_delimited_message() -> bytes | None:
     """Read a size-delimited protobuf message from stdin."""
     # Read 4-byte big-endian length prefix
     length_bytes = sys.stdin.buffer.read(4)
@@ -274,7 +299,7 @@ def read_size_delimited_message():
     return message_bytes
 
 
-def write_size_delimited_message(message_bytes):
+def write_size_delimited_message(message_bytes: bytes) -> None:
     """Write a size-delimited protobuf message to stdout."""
     # Write 4-byte big-endian length prefix
     length = len(message_bytes)
@@ -285,7 +310,7 @@ def write_size_delimited_message(message_bytes):
     sys.stdout.buffer.flush()
 
 
-def main():
+def main() -> None:
     """Main loop that reads requests from stdin and writes responses to stdout."""
     while True:
         try:

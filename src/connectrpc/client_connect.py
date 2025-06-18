@@ -58,7 +58,9 @@ class ConnectProtocolClient(BaseClient):
         async with self._http_client.request(
             "POST", url, data=data, headers=headers, timeout=timeout
         ) as resp:
-            output = ConnectUnaryOutput(response_headers=resp.headers)
+            output: ConnectUnaryOutput[T] = ConnectUnaryOutput(
+                response_headers=MultiDict(resp.headers)
+            )
             if resp.status != 200:
                 output._error = await self.unary_error(resp)
                 return output
@@ -72,7 +74,9 @@ class ConnectProtocolClient(BaseClient):
                 body = await resp.read()
                 response_msg = self.serde.deserialize(body, response_type)
             except Exception as e:
-                output._error = e
+                from .errors import ConnectErrorCode
+
+                output._error = ConnectError(ConnectErrorCode.INTERNAL, str(e))
                 raise ConnectPartialUnaryResponse(output) from e
 
             output._message = response_msg
@@ -120,7 +124,7 @@ class ConnectProtocolClient(BaseClient):
         stream_output = ConnectStreamOutput(http_response, response_type, self.serde)
         if http_response.status != 200:
             txt = await http_response.text()
-            stream_output._abort_with_error(
+            await stream_output._abort_with_error(
                 ConnectError.from_http_response(http_response.status, txt)
             )
         return stream_output
@@ -134,7 +138,7 @@ class ConnectUnaryOutput(UnaryOutput[T]):
     def __init__(self, message: T | None = None, response_headers: MultiDict[str] | None = None):
         self._message = message
         self._response_headers = response_headers
-        self._error = None
+        self._error: ConnectError | None = None
 
     def message(self) -> T | None:
         return self._message
@@ -150,7 +154,7 @@ class ConnectUnaryOutput(UnaryOutput[T]):
         if self._response_headers is None:
             return None
 
-        trailers = MultiDict()
+        trailers: MultiDict[str] = MultiDict()
         for key, value in self._response_headers.items():
             key_clean = str(key).lower()
             if key_clean.startswith("trailer-"):
@@ -180,9 +184,11 @@ class ConnectStreamOutput(StreamOutput[T]):
         self._released = False
         self._error: ConnectError | None = None
 
-    def _abort_with_error(self, err: Exception) -> None:
-        self._error = err
-        self.close()
+    async def _abort_with_error(self, err: Exception) -> None:
+        from .errors import ConnectErrorCode
+
+        self._error = ConnectError(ConnectErrorCode.INTERNAL, str(err))
+        await self.close()
 
     async def __anext__(self) -> T:
         if self._consumed or self._released:
@@ -253,7 +259,7 @@ class ConnectStreamOutput(StreamOutput[T]):
 
 
 class ConnectPartialUnaryResponse(Exception):
-    def __init__(self, partial_response: ConnectUnaryOutput):
+    def __init__(self, partial_response: ConnectUnaryOutput[Any]):
         super().__init__("server response was interrupted, partial content received")
         self.partial_response = partial_response
 
@@ -270,6 +276,6 @@ class UnexpectedContentType(ConnectProtocolError):
     pass
 
 
-def debug(*args):
+def debug(*args: Any) -> None:
     pass
     # print(*args, file=sys.stderr)

@@ -1,6 +1,11 @@
 # Run mypy type checking
-mypy:
-    mypy --package connectrpc && mypy tests examples
+mypy: mypy-package mypy-tests
+
+mypy-package:
+    mypy --package connectrpc
+
+mypy-tests:
+    MYPYPATH=tests/conformance mypy --module conformance_client --module connectrpc.conformance.v1.service_pb2_connect
 
 # Format code with ruff
 format:

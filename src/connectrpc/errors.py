@@ -102,7 +102,7 @@ class ConnectErrorDetail:
             "value": self.value,
         }
         if self.debug is not None:
-            v["debug"] = v
+            v["debug"] = self.debug
         return v
 
     def message(self, symbol_db: SymbolDatabase | None = None) -> Message:
@@ -160,12 +160,12 @@ class ConnectError(Exception):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert error to dictionary representation."""
-        result = {
+        result: dict[str, Any] = {
             "code": self.code.code_name,
             "message": self.message,
         }
         if self.details:
-            result["details"] = [self.details.to_dict()]
+            result["details"] = [detail.to_dict() for detail in self.details]
         return result
 
     @classmethod
@@ -210,9 +210,9 @@ class ConnectError(Exception):
         message = data.get("message", "")
 
         # Parse the Connect error code
-        code = ConnectErrorCode.from_code_name(code_name)
+        code = ConnectErrorCode.from_code_name(code_name) if code_name else None
         if not code:
-            code = infer_connect_code_from_http_status(http_status)
+            code = infer_connect_code_from_http_status(http_status or 500)
 
         # Extract additional details (everything except code/message)
         details = data.get("details", [])

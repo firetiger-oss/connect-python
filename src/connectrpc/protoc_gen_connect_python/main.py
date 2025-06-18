@@ -18,7 +18,7 @@ from google.protobuf.compiler import plugin_pb2
 def main() -> None:
     opts = protogen.Options(
         supported_features=[
-            plugin_pb2.CodeGeneratorResponse.Feature.FEATURE_PROTO3_OPTIONAL,
+            plugin_pb2.CodeGeneratorResponse.Feature.FEATURE_PROTO3_OPTIONAL,  # type: ignore[list-item]
         ]
     )
     opts.run(generate)
