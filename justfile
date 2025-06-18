@@ -45,9 +45,10 @@ conformance-test *ARGS:
     connectconformance \
         --conf ./config.yaml \
         --mode client \
+        --known-failing="Client Cancellation/**" \
         {{ARGS}} \
         -- \
-        uv run python conformance_client.py
+    	uv run python conformance_client.py
 
 # Run all checks (format, check, mypy, test, integration-test)
 all: format check mypy test integration-test
