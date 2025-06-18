@@ -243,7 +243,11 @@ def exception_to_proto(error: Exception) -> Error:
         error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
 
     if isinstance(error, UnexpectedContentType):
-        error = ConnectError(ConnectErrorCode.UNKNOWN, str(error))
+        if error.content_type_received.startswith("application"):
+            # Fairly silly, but the test suite treats this differently
+            error = ConnectError(ConnectErrorCode.INTERNAL, str(error))
+        else:
+            error = ConnectError(ConnectErrorCode.UNKNOWN, str(error))
 
     if not isinstance(error, ConnectError):
         tb = traceback.format_tb(error.__traceback__)

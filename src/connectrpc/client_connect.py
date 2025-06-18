@@ -67,9 +67,7 @@ class ConnectProtocolClient(BaseClient):
                 return output
 
             if resp.headers["Content-Type"] != self.serde.unary_content_type:
-                raise UnexpectedContentType(
-                    f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
-                )
+                raise UnexpectedContentType(resp.headers["Content-Type"])
 
             try:
                 body = await resp.read()
@@ -118,9 +116,7 @@ class ConnectProtocolClient(BaseClient):
         )
         if http_response.headers["Content-Type"] != self.serde.streaming_content_type:
             await http_response.release()
-            raise UnexpectedContentType(
-                f"got unexpected Content-Type in response: {http_response.headers['Content-Type']}"
-            )
+            raise UnexpectedContentType(http_response.headers["Content-Type"])
 
         stream_output = ConnectStreamOutput(http_response, response_type, self.serde)
         if http_response.status != 200:
@@ -274,4 +270,6 @@ class ConnectProtocolError(ValueError):
 
 
 class UnexpectedContentType(ConnectProtocolError):
-    pass
+    def __init__(self, content_type: str):
+        super().__init__(f"received unexpected content type '{content_type}'")
+        self.content_type_received = content_type
