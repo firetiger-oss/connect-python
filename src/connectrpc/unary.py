@@ -53,7 +53,7 @@ class ClientStreamingOutput(UnaryOutput[T]):
                     # The server should only give us exactly one
                     # response. If we got multiple, we should abort;
                     # ignore trailers encoded in the stream.
-                    empty_trailers = CIMultiDict()
+                    empty_trailers: CIMultiDict[str] = CIMultiDict()
                     return cls(
                         message=None,
                         headers=stream_output.response_headers(),
@@ -61,7 +61,7 @@ class ClientStreamingOutput(UnaryOutput[T]):
                         error=ConnectError(
                             ConnectErrorCode.UNIMPLEMENTED,
                             "server responded with multiple messages; expecting exactly one",
-                        )
+                        ),
                     )
 
                 response = message
