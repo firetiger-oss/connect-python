@@ -11,6 +11,7 @@ from google.protobuf.any_pb2 import Any
 from multidict import CIMultiDict
 
 from connectrpc.client import ConnectProtocol
+from connectrpc.client_connect import UnexpectedContentType
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatRequest
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatResponse
 from connectrpc.conformance.v1.client_compat_pb2 import ClientResponseResult
@@ -218,6 +219,9 @@ def multidict_to_proto(headers: CIMultiDict) -> list[Header]:
 def exception_to_proto(error: Exception) -> Error:
     if isinstance(error, TimeoutError):
         error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
+
+    if isinstance(error, UnexpectedContentType):
+        error = ConnectError(ConnectErrorCode.UNKNOWN, str(error))
 
     if not isinstance(error, ConnectError):
         tb = traceback.format_tb(error.__traceback__)

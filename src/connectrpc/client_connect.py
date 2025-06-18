@@ -14,7 +14,6 @@ from .client_base import BaseClient
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .connect_serialization import ConnectSerialization
 from .errors import ConnectError
-from .errors import ConnectProtocolError
 from .headers import HeaderInput
 from .headers import merge_headers
 from .streams import StreamOutput
@@ -65,7 +64,7 @@ class ConnectProtocolClient(BaseClient):
                 return output
 
             if resp.headers["Content-Type"] != self.serde.unary_content_type:
-                raise ConnectProtocolError(
+                raise UnexpectedContentType(
                     f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
                 )
 
@@ -114,7 +113,7 @@ class ConnectProtocolClient(BaseClient):
         )
         if http_response.headers["Content-Type"] != self.serde.streaming_content_type:
             await http_response.release()
-            raise ConnectProtocolError(
+            raise UnexpectedContentType(
                 f"got unexpected Content-Type in response: {http_response.headers['Content-Type']}"
             )
 
@@ -257,6 +256,18 @@ class ConnectPartialUnaryResponse(Exception):
     def __init__(self, partial_response: ConnectUnaryOutput):
         super().__init__("server response was interrupted, partial content received")
         self.partial_response = partial_response
+
+
+class ConnectProtocolError(ValueError):
+    """ConnectProtocolError represents an error in which a client or
+    server didn't obey the Connect Protocol Spec.
+    """
+
+    pass
+
+
+class UnexpectedContentType(ConnectProtocolError):
+    pass
 
 
 def debug(*args):

@@ -266,11 +266,3 @@ class ConnectError(Exception):
 
     def __repr__(self) -> str:
         return f"ConnectError(code={self.code.code_name!r}, message={self.message!r})"
-
-
-class ConnectProtocolError(Exception):
-    """ConnectProtocolError represents an error in which a client or
-    server didn't obey the Connect Protocol Spec.
-    """
-
-    pass
