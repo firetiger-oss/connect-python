@@ -22,7 +22,7 @@ class EndStreamResponse:
         data_dict = json.loads(data)
 
         val = EndStreamResponse(error=None, metadata=None)
-        if "error" in data_dict:
+        if "error" in data_dict and data_dict["error"] is not None:
             val.error = ConnectError.from_dict(data_dict["error"])
 
         if "metadata" in data_dict:

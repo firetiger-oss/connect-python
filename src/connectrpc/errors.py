@@ -204,7 +204,10 @@ class ConnectError(Exception):
             ValueError: If required fields are missing
         """
         if not isinstance(data, dict):
-            raise ValueError("Error data must be a dictionary")
+            return ConnectError(
+                ConnectErrorCode.UNKNOWN,
+                "invalid error response received",
+            )
 
         code_name = data.get("code")
         message = data.get("message", "")
