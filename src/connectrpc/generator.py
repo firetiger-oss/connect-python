@@ -15,14 +15,18 @@ common_args = [
 common_args_str = ", ".join(common_args)
 
 
+def docstring(g: protogen.GeneratedFile, *args):
+    g.P("\"\"\"", *args, "\"\"\"")
+
 def _generate_unary_rpc(
     g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method
 ) -> None:
     """Generate a unary RPC method."""
-    g.P("async def ", m.py_name, "_with_metadata(")
+    g.P("async def call_", m.py_name, "(")
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
     g.P(") -> UnaryOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
+    docstring(g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata")
     g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
     g.P(
         "return await self._connect_client.call_unary(url, req, ",
@@ -37,7 +41,9 @@ def _generate_unary_rpc(
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
     g.P(") -> ", m.output.py_ident, ":")
     g.set_indent(8)
-    g.P("response = await self.", m.py_name, "_with_metadata(req, ", common_args_str, ")")
+    g.P("response = await self.call_", m.py_name, "(req, ", common_args_str, ")")
+    g.P("if response.error() is not None:")
+    g.P("    raise response.error()")
     g.P("return response.message()")
     g.set_indent(4)
     g.P()
@@ -51,32 +57,31 @@ def _generate_server_streaming_rpc(
     g.P("def ", m.py_name, "(")
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
-    g.P("    return self._", m.py_name, "_impl(req, ", common_args_str, ")")
+    g.P("    return self._", m.py_name, "_iterator(req, ", common_args_str, ")")
     g.P()
 
     # Implementation helper
-    g.P("async def _", m.py_name, "_impl(")
+    g.P("async def _", m.py_name, "_iterator(")
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
-    g.set_indent(8)
-    g.P("async with await self.", m.py_name, "_stream(req, extra_headers) as stream:")
-    g.set_indent(12)
-    g.P("async for response in stream:")
-    g.set_indent(16)
-    g.P("yield response")
-    g.set_indent(4)
+    g.P("    stream_output = await self.call_", m.py_name, "(req, extra_headers)")
+    g.P("    if stream_output.error() is not None:")
+    g.P("        raise stream_output.error()")
+    g.P("    async with await stream_output as stream:")
+    g.P("        async for response in stream:")
+    g.P("            yield response")
     g.P()
 
-    # Stream method for metadata access
-    g.P("async def ", m.py_name, "_stream(")
+    g.P("async def call_", m.py_name, "(")
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
-    g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
-    g.P("return await self._connect_client.call_server_streaming(")
-    g.P("    url, req, ", m.output.py_ident, ", ", common_args_str)
-    g.P(")")
-    g.set_indent(4)
+    docstring(g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata")
+    g.set_indent(4)    
+    g.P('    url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
+    g.P("    return await self._connect_client.call_server_streaming(")
+    g.P("        url, req, ", m.output.py_ident, ", ", common_args_str)
+    g.P("    )")
     g.P()
 
 
@@ -84,16 +89,29 @@ def _generate_client_streaming_rpc(
     g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service, m: protogen.Method
 ) -> None:
     """Generate a client streaming RPC method."""
+    g.P("async def call_", m.py_name, "(")
+    g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str)
+    g.P(") -> StreamOutput[", m.output.py_ident, "]:")
+    g.set_indent(8)
+    docstring(g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata")
+    g.set_indent(4)    
+    g.P('    url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
+    g.P("    return await self._connect_client.call_client_streaming(")
+    g.P("        url, reqs, ", m.output.py_ident, ", ", common_args_str)
+    g.P("    )")
+    g.P()
+
     g.P("async def ", m.py_name, "(")
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str)
     g.P(") -> ", m.output.py_ident, ":")
-    g.set_indent(8)
-    g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
-    g.P("return await self._connect_client.call_client_streaming(")
-    g.P("    url, reqs, ", m.output.py_ident, ", ", common_args_str)
-    g.P(")")
-    g.set_indent(4)
+    g.P("    stream_output = await self.call_", m.py_name, "(req, extra_headers)")
+    g.P("    if stream_output.error() is not None:")
+    g.P("        raise stream_output.error()")
+    g.P("    async with await stream_output as stream:")
+    g.P("        async for response in stream:")
+    g.P("            return response")
     g.P()
+
 
 
 def _generate_bidirectional_streaming_rpc(
@@ -104,24 +122,23 @@ def _generate_bidirectional_streaming_rpc(
     g.P("def ", m.py_name, "(")
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str)
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
-    g.P("    return self._", m.py_name, "_impl(reqs, ", common_args_str, ")")
+    g.P("    return self._", m.py_name, "_iterator(reqs, ", common_args_str, ")")
     g.P()
 
     # Implementation helper
-    g.P("async def _", m.py_name, "_impl(")
+    g.P("async def _", m.py_name, "_iterator(")
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str)
     g.P(") -> AsyncIterator[", m.output.py_ident, "]:")
-    g.set_indent(8)
-    g.P("async with await self.", m.py_name, "_stream(reqs, ", common_args_str, ") as stream:")
-    g.set_indent(12)
-    g.P("async for response in stream:")
-    g.set_indent(16)
-    g.P("yield response")
-    g.set_indent(4)
+    g.P("    stream_output = await self.call_", m.py_name, "(reqs, ", common_args_str, ")")
+    g.P("    if stream_output.error() is not None:")
+    g.P("        raise stream_output.error()")
+    g.P("    async with await stream_output as stream:")
+    g.P("        async for response in stream:")
+    g.P("            yield response")
     g.P()
 
     # Stream method for metadata access
-    g.P("async def ", m.py_name, "_stream(")
+    g.P("async def call_", m.py_name, "(")
     g.P(
         "    self, reqs: StreamInput[",
         m.input.py_ident,
@@ -130,11 +147,12 @@ def _generate_bidirectional_streaming_rpc(
     )
     g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
-    g.P('url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
-    g.P("return await self._connect_client.call_bidirectional_streaming(")
-    g.P("    url, reqs, ", m.output.py_ident, ", ", common_args_str)
-    g.P(")")
-    g.set_indent(4)
+    docstring(g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata")
+    g.set_indent(4)    
+    g.P('    url = self.base_url + "/', f.proto.package, ".", s.proto.name, "/", m.proto.name, '"')
+    g.P("    return await self._connect_client.call_bidirectional_streaming(")
+    g.P("        url, reqs, ", m.output.py_ident, ", ", common_args_str)
+    g.P("    )")
     g.P()
 
 

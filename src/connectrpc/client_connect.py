@@ -59,20 +59,21 @@ class ConnectProtocolClient(BaseClient):
         async with self._http_client.request(
             "POST", url, data=data, headers=headers, timeout=timeout
         ) as resp:
+            output = ConnectUnaryOutput(response_headers=resp.headers)
             if resp.status != 200:
-                raise await self.unary_error(resp)
+                output._error = await self.unary_error(resp)
+                return output
 
             if resp.headers["Content-Type"] != self.serde.unary_content_type:
                 raise ConnectProtocolError(
                     f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
                 )
 
-            output = ConnectUnaryOutput(response_headers=resp.headers)
-
             try:
                 body = await resp.read()
                 response_msg = self.serde.deserialize(body, response_type)
             except Exception as e:
+                output._error = e
                 raise ConnectPartialUnaryResponse(output) from e
 
             output._message = response_msg
@@ -93,11 +94,13 @@ class ConnectProtocolClient(BaseClient):
             ]
         )
         headers = merge_headers(headers, extra_headers)
+        debug("calling streaming with headers: ", headers)
 
         async def encoded_stream() -> AsyncIterator[bytes]:
             async for msg in reqs:
                 encoded = self.serde.serialize(msg)
                 envelope = struct.pack(">BI", 0, len(encoded))
+                debug("sending message (length: ", len(encoded), ")")
                 yield envelope + encoded
 
         payload = aiohttp.AsyncIterablePayload(encoded_stream())
@@ -108,19 +111,24 @@ class ConnectProtocolClient(BaseClient):
         else:
             timeout = aiohttp.ClientTimeout(total=None)
 
-        resp = await self._http_client.request(
+        http_response = await self._http_client.request(
             "POST", url, data=payload, headers=headers, timeout=timeout
         )
-        if resp.status != 200:
-            txt = await resp.text()
-            raise ConnectError.from_http_response(resp.status, txt)
-
-        if resp.headers["Content-Type"] != self.serde.streaming_content_type:
-            await resp.release()
+        debug("received headers")
+        if http_response.headers["Content-Type"] != self.serde.streaming_content_type:
+            await http_response.release()
             raise ConnectProtocolError(
-                f"got unexpected Content-Type in response: {resp.headers['Content-Type']}"
+                f"got unexpected Content-Type in response: {http_response.headers['Content-Type']}"
             )
-        return ConnectStreamOutput(resp, response_type, self.serde)
+
+        debug("")
+        debug("called HTTP, got raw_headers: ", http_response.raw_headers)
+        debug("")
+        stream_output = ConnectStreamOutput(http_response, response_type, self.serde)
+        if http_response.status != 200:
+            txt = await http_response.text()
+            stream_output._abort_with_error(ConnectError.from_http_response(http_response.status, txt))
+        return stream_output
 
     async def unary_error(self, resp: aiohttp.ClientResponse) -> ConnectError:
         txt = await resp.text()
@@ -131,12 +139,16 @@ class ConnectUnaryOutput(UnaryOutput[T]):
     def __init__(self, message: T | None = None, response_headers: MultiDict[str] | None = None):
         self._message = message
         self._response_headers = response_headers
+        self._error = None
 
     def message(self) -> T | None:
         return self._message
 
     def response_headers(self) -> MultiDict[str] | None:
         return self._response_headers
+
+    def error(self) -> ConnectError | None:
+        return self._error
 
     def response_trailers(self) -> MultiDict[str] | None:
         # Connect Unary responses encode trailers in headers
@@ -171,45 +183,44 @@ class ConnectStreamOutput(StreamOutput[T]):
         self._trailing_metadata: dict[str, Any] | None = None
         self._consumed = False
         self._released = False
+        self._error: ConnectError | None = None
+
+    def _abort_with_error(self, err: Exception) -> None:
+        self._error = err
+        self.close()
 
     async def __anext__(self) -> T:
-        if self._consumed:
+        if self._consumed or self._released:
+            raise StopAsyncIteration
+        envelope = await self._response_body.readexactly(5)
+        if envelope[0] & 1:
+            # message is compressed, which we dont currently handle
+            raise NotImplementedError("cant handle compressed messages yet")
+        if envelope[0] & 2:
+            # This is an EndStreamResponse
+            encoded = await self._response_body.read(-1)
+            end_stream_response = EndStreamResponse.from_bytes(encoded)
+            self._trailing_metadata = end_stream_response.metadata
+            self._consumed = True
+
+            # Stream is now complete - release connection before StopAsyncIteration
+            await self.close()
+
+            if end_stream_response.error is not None:
+                self._error = end_stream_response.error
+
             raise StopAsyncIteration
 
-        try:
-            envelope = await self._response_body.readexactly(5)
-            if envelope[0] & 1:
-                # message is compressed, which we dont currently handle
-                raise NotImplementedError("cant handle compressed messages yet")
-            if envelope[0] & 2:
-                # This is an EndStreamResponse
-                encoded = await self._response_body.read(-1)
-                end_stream_response = EndStreamResponse.from_bytes(encoded)
-                self._trailing_metadata = end_stream_response.metadata
-                self._consumed = True
-
-                # Stream is now complete - release connection before StopAsyncIteration
-                await self.done()
-
-                if end_stream_response.error is not None:
-                    raise end_stream_response.error
-
-                raise StopAsyncIteration
-
-            length = struct.unpack(">I", envelope[1:5])[0]
-            encoded = await self._response_body.readexactly(length)
-            return self._serde.deserialize(encoded, self._response_type)
-        except Exception:
-            # Ensure connection is released on any exception
-            await self.done()
-            raise
+        length = struct.unpack(">I", envelope[1:5])[0]
+        encoded = await self._response_body.readexactly(length)
+        return self._serde.deserialize(encoded, self._response_type)
 
     def __aiter__(self) -> AsyncIterator[T]:
         return self
 
     def response_headers(self) -> CIMultiDict[str]:
         """Get HTTP response headers from the initial response."""
-        return CIMultiDict(self._response_headers)  # Return copy to avoid mutation
+        return self._response_headers
 
     def trailing_metadata(self) -> dict[str, Any] | None:
         if not self._consumed:
@@ -227,9 +238,9 @@ class ConnectStreamOutput(StreamOutput[T]):
         exc_tb: Any,
     ) -> None:
         """Exit async context manager and clean up connection resources."""
-        await self.done()
+        await self.close()
 
-    async def done(self) -> None:
+    async def close(self) -> None:
         """Explicitly release connection resources.
 
         Safe to call multiple times. Releases the HTTP connection back to
@@ -239,8 +250,19 @@ class ConnectStreamOutput(StreamOutput[T]):
             self._released = True
             await self._response.release()
 
+    def done(self) -> bool:
+        return self._consumed
+
+    def error(self) -> ConnectError | None:
+        return None
+
 
 class ConnectPartialUnaryResponse(Exception):
     def __init__(self, partial_response: ConnectUnaryOutput):
         super().__init__("server response was interrupted, partial content received")
         self.partial_response = partial_response
+
+
+def debug(*args):
+    import sys
+    # print(*args, file=sys.stderr)

@@ -16,6 +16,7 @@ from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .headers import HeaderInput
 from .streams import StreamInput
 from .streams import StreamOutput
+from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
 
@@ -67,7 +68,7 @@ class ConnectClient:
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> T:
+    ) -> UnaryOutput[T]:
         return await self._client.call_unary(
             url, req, response_type, extra_headers=extra_headers, timeout_seconds=timeout_seconds
         )
@@ -79,18 +80,15 @@ class ConnectClient:
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> T:
+    ) -> StreamOutput[T]:
         async_iter = self._to_async_iterator(reqs)
-        stream_output = await self._client.call_streaming(
+        return await self._client.call_streaming(
             url,
             async_iter,
             response_type,
             extra_headers=extra_headers,
             timeout_seconds=timeout_seconds,
         )
-        async for response in stream_output:
-            return response
-        raise RuntimeError("No response received from client streaming call")
 
     async def call_server_streaming(
         self,

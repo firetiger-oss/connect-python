@@ -10,6 +10,8 @@ from google.protobuf.message import Message
 from multidict import MultiDict
 from typing_extensions import Self
 
+from .errors import ConnectError
+
 T = TypeVar("T", bound=Message)
 U = TypeVar("U", bound=Message, covariant=True)
 
@@ -45,7 +47,7 @@ class StreamOutput(Protocol[U]):
                if should_stop:
                    break
        finally:
-           await stream.done()  # Explicit cleanup required
+           await stream.close()  # Explicit cleanup required
        ```
 
     ## For Implementers
@@ -54,7 +56,7 @@ class StreamOutput(Protocol[U]):
     - Support async iteration protocol (__aiter__)
     - Provide trailing metadata access after consumption
     - Implement async context manager protocol for automatic cleanup
-    - Provide explicit done() method for manual cleanup
+    - Provide explicit close() method for manual cleanup
     - Ensure connection resources are released exactly once
     - Handle cleanup on normal completion, early termination, and exceptions
 
@@ -65,7 +67,7 @@ class StreamOutput(Protocol[U]):
     - Resources must be released when:
       * Stream is fully consumed (normal completion)
       * Context manager exits (__aexit__)
-      * done() method is called explicitly
+      * close() method is called explicitly
       * An exception occurs during streaming
     - Resources should be returned to connection pools when possible (use
       release() rather than close() for HTTP connections)
@@ -89,6 +91,16 @@ class StreamOutput(Protocol[U]):
         """
         ...
 
+    def done(self) -> bool:
+        """Returns true when the stream has been fully consumed. """
+        ...
+
+    def error(self) -> ConnectError | None:
+        """
+        Returns any error encountered while reading the stream, if one exists.
+        """
+        ...
+
     async def __aenter__(self) -> Self:
         """Enter async context manager for automatic resource management."""
         ...
@@ -102,7 +114,7 @@ class StreamOutput(Protocol[U]):
         """Exit async context manager and clean up connection resources."""
         ...
 
-    async def done(self) -> None:
+    async def close(self) -> None:
         """Explicitly release connection resources.
 
         This method should be called when finished with the stream to ensure

@@ -18,6 +18,7 @@ from connectrpc.conformance.v1.client_compat_pb2 import ClientResponseResult
 from connectrpc.conformance.v1.config_pb2 import Code
 from connectrpc.conformance.v1.config_pb2 import Codec
 from connectrpc.conformance.v1.config_pb2 import Protocol
+from connectrpc.conformance.v1.service_pb2 import BidiStreamRequest
 from connectrpc.conformance.v1.service_pb2 import ClientStreamRequest
 from connectrpc.conformance.v1.service_pb2 import Error
 from connectrpc.conformance.v1.service_pb2 import Header
@@ -31,11 +32,20 @@ from connectrpc.streams import StreamOutput
 from connectrpc.unary import UnaryOutput
 
 
+def debug(*args, **kwargs):
+    #print(*args, **kwargs, file=sys.stderr)
+    pass
+
+
 async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
     """Handle a ClientCompatRequest and return a blank ClientCompatResponse."""
 
     response = ClientCompatResponse()
     response.test_name = request.test_name
+    debug("request: ", request)
+    timeout_seconds: float | None = None
+    if request.timeout_ms != 0:
+        timeout_seconds = request.timeout_ms / 1000.0
     try:
         async with aiohttp.ClientSession() as http_session:
             if request.protocol != Protocol.PROTOCOL_CONNECT:
@@ -65,16 +75,13 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
                 response = ClientCompatResponse()
                 response.test_name = request.test_name
-                try:
-                    server_response = await client.unary_with_metadata(
-                        request_payload,
-                        extra_headers=extra_headers,
-                        timeout_seconds=request.timeout_ms / 1000.0,
-                    )
-                    result = result_from_unary_output(server_response)
-                    response.response.MergeFrom(result)
-                except Exception as error:
-                    response.response.CopyFrom(error_response(error))
+                server_response = await client.call_unary(
+                    request_payload,
+                    extra_headers=extra_headers,
+                    timeout_seconds=timeout_seconds,
+                )
+                result = result_from_unary_output(server_response)
+                response.response.MergeFrom(result)
 
             elif request.method == "ServerStream":
                 assert len(request.request_messages) == 1
@@ -83,21 +90,13 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                 assert req_msg.Is(request_payload.DESCRIPTOR)
                 req_msg.Unpack(request_payload)
 
-                try:
-                    stream_output = await client.server_stream_stream(
-                        request_payload,
-                        extra_headers=extra_headers,
-                        timeout_seconds=request.timeout_ms / 1000.0,
-                    )
-                    result = await result_from_stream_output(stream_output)
-                    response.response.MergeFrom(result)
-                except Exception as error:
-                    try:
-                        result = await result_from_stream_output(stream_output)
-                        response.response.MergeFrom(result)
-                    except Exception:
-                        pass
-                    response.response.MergeFrom(error_response(error))
+                stream_output = await client.call_server_stream(
+                    request_payload,
+                    extra_headers=extra_headers,
+                    timeout_seconds=timeout_seconds,
+                )
+                result = await result_from_stream_output(stream_output)
+                response.response.MergeFrom(result)
 
             elif request.method == "ClientStream":
 
@@ -107,42 +106,30 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         msg.Unpack(req_payload)
                         await asyncio.sleep(request.request_delay_ms / 1000.0)
                         yield req_payload
-
-                try:
-                    server_response = await client.client_stream(
-                        client_requests(),
-                        extra_headers=extra_headers,
-                        timeout_seconds=request.timeout_ms / 1000.0,
-                    )
-                    response.response.payloads.append(server_response.payload)
-
-                except Exception as error:
-                    response.response.CopyFrom(error_response(error))
+                stream_output = await client.call_client_stream(
+                    client_requests(),
+                    extra_headers=extra_headers,
+                    timeout_seconds=timeout_seconds,
+                )
+                result = await result_from_stream_output(stream_output)
+                response.response.MergeFrom(result)
 
             elif request.method == "BidiStream":
 
                 async def client_requests():
                     for msg in request.request_messages:
-                        req_payload = ClientStreamRequest()
+                        req_payload = BidiStreamRequest()
                         msg.Unpack(req_payload)
                         await asyncio.sleep(request.request_delay_ms / 1000.0)
                         yield req_payload
 
-                try:
-                    stream_output = await client.bidi_stream_stream(
-                        client_requests(),
-                        extra_headers=extra_headers,
-                        timeout_seconds=request.timeout_ms / 1000.0,
-                    )
-                    result = await result_from_stream_output(stream_output)
-                    response.response.MergeFrom(result)
-                except Exception as error:
-                    try:
-                        result = await result_from_stream_output(stream_output)
-                        response.response.MergeFrom(result)
-                    except Exception:
-                        raise
-                    response.response.CopyFrom(error_response(error))
+                stream_output = await client.call_bidi_stream(
+                    client_requests(),
+                    extra_headers=extra_headers,
+                    timeout_seconds=timeout_seconds,
+                )
+                result = await result_from_stream_output(stream_output)
+                response.response.MergeFrom(result)
 
             elif request.method == "Unimplemented":
                 # Same as Unary
@@ -155,30 +142,30 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
                 response = ClientCompatResponse()
                 response.test_name = request.test_name
-                try:
-                    server_response = await client.unimplemented_with_metadata(
-                        request_payload,
-                        extra_headers=extra_headers,
-                        timeout_seconds=request.timeout_ms / 1000.0,
-                    )
-                    result = result_from_unary_output(server_response)
-                    response.response.MergeFrom(result)
-                except Exception as error:
-                    response.response.CopyFrom(error_response(error))
-
+                server_response = await client.call_unimplemented(
+                    request_payload,
+                    extra_headers=extra_headers,
+                    timeout_seconds=timeout_seconds,
+                )
+                result = result_from_unary_output(server_response)
+                response.response.MergeFrom(result)
             else:
                 raise NotImplementedError(f"not implemented: {request.method}")
 
+        debug("response: ", response)
         return response
-    except Exception:
-        response.error.CopyFrom(ClientErrorResult(message=traceback.format_exc()))
+    except Exception as error:
+        debug("exceptional response: ", response)
+        proto_err = exception_to_proto(error)
+        response.response.error.MergeFrom(proto_err)
         return response
 
 
 async def result_from_stream_output(stream_output: StreamOutput) -> ClientResponseResult:
     result = ClientResponseResult()
-    async for server_msg in stream_output:
-        result.payloads.append(server_msg.payload)
+    async with stream_output as stream:
+        async for server_msg in stream:
+            result.payloads.append(server_msg.payload)
 
     resp_headers = multidict_to_proto(stream_output.response_headers())
     result.response_headers.extend(resp_headers)
@@ -188,12 +175,18 @@ async def result_from_stream_output(stream_output: StreamOutput) -> ClientRespon
         resp_trailers_proto = [Header(name=k, value=v) for k, v in resp_trailers.items()]
         result.response_trailers.extend(resp_trailers_proto)
 
+    if stream_output.error() is not None:
+        result.error.CopyFrom(exception_to_proto(stream_output.error()))
+
     return result
 
 
 def result_from_unary_output(unary_output: UnaryOutput) -> ClientResponseResult:
     result = ClientResponseResult()
-    result.payloads.append(unary_output.message().payload)
+    if unary_output.error() is not None:
+        result.error.CopyFrom(exception_to_proto(unary_output.error()))
+    if unary_output.message() is not None:
+        result.payloads.append(unary_output.message().payload)
 
     resp_headers = multidict_to_proto(unary_output.response_headers())
     result.response_headers.extend(resp_headers)
@@ -222,12 +215,13 @@ def multidict_to_proto(headers: CIMultiDict) -> list[Header]:
     return result
 
 
-def error_response(error: Exception) -> ClientResponseResult:
+def exception_to_proto(error: Exception) -> Error:
     if isinstance(error, TimeoutError):
         error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
 
     if not isinstance(error, ConnectError):
-        error = ConnectError(ConnectErrorCode.INTERNAL, str(error))
+        tb = traceback.format_tb(error.__traceback__)
+        error = ConnectError(ConnectErrorCode.INTERNAL, str(tb))
 
     details: list[Any] = []
     if isinstance(error.details, list):
@@ -255,10 +249,7 @@ def error_response(error: Exception) -> ClientResponseResult:
         ConnectErrorCode.UNAUTHENTICATED: Code.CODE_UNAUTHENTICATED,
     }[error.code]
 
-    err = Error(code=code, message=error.message, details=details)
-    return ClientResponseResult(
-        error=err,
-    )
+    return Error(code=code, message=error.message, details=details)
 
 
 def read_size_delimited_message():
