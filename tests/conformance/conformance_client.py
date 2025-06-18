@@ -33,15 +33,11 @@ from connectrpc.conformance.v1.service_pb2 import UnaryResponse
 from connectrpc.conformance.v1.service_pb2 import UnimplementedRequest
 from connectrpc.conformance.v1.service_pb2 import UnimplementedResponse
 from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
+from connectrpc.debugprint import debug
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
 from connectrpc.streams import StreamOutput
 from connectrpc.unary import UnaryOutput
-
-
-def debug(*args: Any) -> None:
-    # print(*args, **kwargs, file=sys.stderr)
-    pass
 
 
 async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
@@ -53,6 +49,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
     timeout_seconds: float | None = None
     if request.timeout_ms != 0:
         timeout_seconds = request.timeout_ms / 1000.0
+    debug("request timeout: ", timeout_seconds)
     try:
         async with aiohttp.ClientSession() as http_session:
             if request.protocol != Protocol.PROTOCOL_CONNECT:

@@ -13,6 +13,7 @@ from .client_grpc import ConnectGRPCClient
 from .client_grpc_web import ConnectGRPCWebClient
 from .connect_serialization import CONNECT_JSON_SERIALIZATION
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
+from .debugprint import debug
 from .headers import HeaderInput
 from .streams import StreamInput
 from .streams import StreamOutput
@@ -69,6 +70,8 @@ class ConnectClient:
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
     ) -> UnaryOutput[T]:
+        debug("ConnectClient.call_unary timeout=", timeout_seconds)
+        debug("ConnectClient._client=", self._client)
         return await self._client.call_unary(
             url, req, response_type, extra_headers=extra_headers, timeout_seconds=timeout_seconds
         )

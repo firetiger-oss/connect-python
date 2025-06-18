@@ -13,6 +13,9 @@ from connectrpc.unary import UnaryOutput
 
 import connectrpc.conformance.v1.service_pb2
 
+
+from connectrpc.debugprint import debug
+
 class ConformanceServiceClient:
     def __init__(
         self,
@@ -28,7 +31,9 @@ class ConformanceServiceClient:
     ) -> UnaryOutput[connectrpc.conformance.v1.service_pb2.UnaryResponse]:
         """Low-level method to call Unary, granting access to errors and metadata"""
         url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/Unary"
-        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.UnaryResponse,extra_headers, timeout_seconds)
+        debug("ConformanceServiceClient.call_unary timeout=", timeout_seconds)
+        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.UnaryResponse,
+                                                     extra_headers, timeout_seconds)
 
     async def unary(
         self, req: connectrpc.conformance.v1.service_pb2.UnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None

@@ -13,6 +13,7 @@ from multidict import MultiDict
 from .client_base import BaseClient
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .connect_serialization import ConnectSerialization
+from .debugprint import debug
 from .errors import ConnectError
 from .headers import HeaderInput
 from .headers import merge_headers
@@ -48,13 +49,13 @@ class ConnectProtocolClient(BaseClient):
             ]
         )
         headers = merge_headers(headers, extra_headers)
-
+        debug("ConnectProtocolClient.call_unary timeout_seconds=", timeout_seconds)
         if timeout_seconds is not None and timeout_seconds > 0:
-            headers["Connect-Timeout-Ms"] = str(int(timeout_seconds / 1000))
+            headers["Connect-Timeout-Ms"] = str(int(timeout_seconds * 1000))
             timeout = aiohttp.ClientTimeout(total=timeout_seconds)
         else:
             timeout = aiohttp.ClientTimeout(total=None)
-
+        debug("ConnectProtocolClient.call_unary timeout=", timeout)
         async with self._http_client.request(
             "POST", url, data=data, headers=headers, timeout=timeout
         ) as resp:
@@ -107,7 +108,7 @@ class ConnectProtocolClient(BaseClient):
         payload = aiohttp.AsyncIterablePayload(encoded_stream())
 
         if timeout_seconds is not None and timeout_seconds > 0:
-            headers["Connect-Timeout-Ms"] = str(int(timeout_seconds / 1000))
+            headers["Connect-Timeout-Ms"] = str(int(timeout_seconds * 1000))
             timeout = aiohttp.ClientTimeout(total=timeout_seconds)
         else:
             timeout = aiohttp.ClientTimeout(total=None)
@@ -274,8 +275,3 @@ class ConnectProtocolError(ValueError):
 
 class UnexpectedContentType(ConnectProtocolError):
     pass
-
-
-def debug(*args: Any) -> None:
-    pass
-    # print(*args, file=sys.stderr)
