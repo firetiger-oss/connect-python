@@ -50,11 +50,20 @@ class ClientStreamingOutput(UnaryOutput[T]):
         async with stream_output as stream:
             async for message in stream:
                 if response is not None:
-                    error = ConnectError(
-                        ConnectErrorCode.UNIMPLEMENTED,
-                        "server responded with multiple messages; expecting exactly one",
+                    # The server should only give us exactly one
+                    # response. If we got multiple, we should abort;
+                    # ignore trailers encoded in the stream.
+                    empty_trailers = CIMultiDict()
+                    return cls(
+                        message=None,
+                        headers=stream_output.response_headers(),
+                        trailers=empty_trailers,
+                        error=ConnectError(
+                            ConnectErrorCode.UNIMPLEMENTED,
+                            "server responded with multiple messages; expecting exactly one",
+                        )
                     )
-                    break
+
                 response = message
 
         if response is None:
