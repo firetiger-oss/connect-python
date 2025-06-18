@@ -5,7 +5,7 @@ import sys
 
 import aiohttp
 import eliza_pb2  # type: ignore[import-not-found]
-from eliza import ElizaServiceClient  # type: ignore[import-not-found]
+from eliza_pb2_connect import ElizaServiceClient  # type: ignore[import-not-found]
 
 from connectrpc.client import ConnectProtocol
 
@@ -87,7 +87,7 @@ async def test_converse(client: ElizaServiceClient, protocol_name: str) -> bool:
         raise
 
 
-async def test_introduce_stream(client: ElizaServiceClient, protocol_name: str) -> bool:
+async def test_call_introduce(client: ElizaServiceClient, protocol_name: str) -> bool:
     """Test the Introduce server streaming RPC method with metadata access"""
     print(f"  [{protocol_name}] Testing Introduce stream method with metadata...")
 
@@ -96,7 +96,7 @@ async def test_introduce_stream(client: ElizaServiceClient, protocol_name: str) 
 
     try:
         responses = []
-        async with await client.introduce_stream(request) as stream:
+        async with await client.call_introduce(request) as stream:
             async for response in stream:
                 responses.append(response.sentence)
                 print(f"    Eliza: {response.sentence}")
@@ -135,7 +135,7 @@ async def test_protocol(protocol: ConnectProtocol, protocol_name: str) -> list[b
         results.append(await test_say(client, protocol_name))
         results.append(await test_introduce(client, protocol_name))
         results.append(await test_converse(client, protocol_name))
-        results.append(await test_introduce_stream(client, protocol_name))
+        results.append(await test_call_introduce(client, protocol_name))        
 
         return results
 
