@@ -34,7 +34,9 @@ def normalize_headers(input_headers: HeaderInput | None) -> HeadersInternal:
         return CIMultiDict()
 
     if isinstance(input_headers, CIMultiDict):
-        # Already in the right format, return copy to avoid mutation
+        return CIMultiDict(input_headers)
+
+    if isinstance(input_headers, MultiDict):
         return CIMultiDict(input_headers)
 
     result: CIMultiDict[str] = CIMultiDict()
