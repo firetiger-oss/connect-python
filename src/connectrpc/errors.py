@@ -205,7 +205,7 @@ class ConnectError(Exception):
         """
         if not isinstance(data, dict):
             return ConnectError(
-                ConnectErrorCode.UNKNOWN,
+                ConnectErrorCode.UNAUTHENTICATED,
                 "invalid error response received",
             )
 
