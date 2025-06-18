@@ -10,11 +10,9 @@ from connectrpc.headers import HeaderInput
 from connectrpc.streams import StreamInput
 from connectrpc.streams import StreamOutput
 from connectrpc.unary import UnaryOutput
+from connectrpc.unary import ClientStreamingOutput
 
 import connectrpc.conformance.v1.service_pb2
-
-
-from connectrpc.debugprint import debug
 
 class ConformanceServiceClient:
     def __init__(
@@ -31,9 +29,7 @@ class ConformanceServiceClient:
     ) -> UnaryOutput[connectrpc.conformance.v1.service_pb2.UnaryResponse]:
         """Low-level method to call Unary, granting access to errors and metadata"""
         url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/Unary"
-        debug("ConformanceServiceClient.call_unary timeout=", timeout_seconds)
-        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.UnaryResponse,
-                                                     extra_headers, timeout_seconds)
+        return await self._connect_client.call_unary(url, req, connectrpc.conformance.v1.service_pb2.UnaryResponse,extra_headers, timeout_seconds)
 
     async def unary(
         self, req: connectrpc.conformance.v1.service_pb2.UnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -74,7 +70,7 @@ class ConformanceServiceClient:
 
     async def call_client_stream(
         self, reqs: StreamInput[connectrpc.conformance.v1.service_pb2.ClientStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
-    ) -> StreamOutput[connectrpc.conformance.v1.service_pb2.ClientStreamResponse]:
+    ) -> ClientStreamingOutput[connectrpc.conformance.v1.service_pb2.ClientStreamResponse]:
         """Low-level method to call ClientStream, granting access to errors and metadata"""
         url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/ClientStream"
         return await self._connect_client.call_client_streaming(
@@ -84,14 +80,14 @@ class ConformanceServiceClient:
     async def client_stream(
         self, reqs: StreamInput[connectrpc.conformance.v1.service_pb2.ClientStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
     ) -> connectrpc.conformance.v1.service_pb2.ClientStreamResponse:
-        stream_output = await self.call_client_stream(reqs, extra_headers)
-        err = stream_output.error()
+        client_stream_output = await self.call_client_stream(reqs, extra_headers)
+        err = client_stream_output.error()
         if err is not None:
             raise err
-        async with stream_output as stream:
-            async for response in stream:
-                return response
-        raise ConnectProtocolError('no response message received')
+        msg = client_stream_output.message()
+        if msg is None:
+            raise RuntimeError('ClientStreamOutput has empty error and message')
+        return msg
 
     def bidi_stream(
         self, reqs: StreamInput[connectrpc.conformance.v1.service_pb2.BidiStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None

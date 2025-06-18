@@ -101,7 +101,7 @@ def _generate_client_streaming_rpc(
     """Generate a client streaming RPC method."""
     g.P("async def call_", m.py_name, "(")
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str)
-    g.P(") -> StreamOutput[", m.output.py_ident, "]:")
+    g.P(") -> ClientStreamingOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
     docstring(
         g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata"
@@ -116,14 +116,14 @@ def _generate_client_streaming_rpc(
     g.P("async def ", m.py_name, "(")
     g.P("    self, reqs: StreamInput[", m.input.py_ident, "], ", common_params_str)
     g.P(") -> ", m.output.py_ident, ":")
-    g.P("    stream_output = await self.call_", m.py_name, "(reqs, extra_headers)")
-    g.P("    err = stream_output.error()")
+    g.P("    client_stream_output = await self.call_", m.py_name, "(reqs, extra_headers)")
+    g.P("    err = client_stream_output.error()")
     g.P("    if err is not None:")
     g.P("        raise err")
-    g.P("    async with stream_output as stream:")
-    g.P("        async for response in stream:")
-    g.P("            return response")
-    g.P("    raise ConnectProtocolError('no response message received')")
+    g.P("    msg = client_stream_output.message()")
+    g.P("    if msg is None:")
+    g.P("        raise RuntimeError('ClientStreamOutput has empty error and message')")
+    g.P("    return msg")
     g.P()
 
 
@@ -194,6 +194,7 @@ def generate(gen: protogen.Plugin) -> None:
         g.P("from connectrpc.streams import StreamInput")
         g.P("from connectrpc.streams import StreamOutput")
         g.P("from connectrpc.unary import UnaryOutput")
+        g.P("from connectrpc.unary import ClientStreamingOutput")
         g.P()
         g.print_import()
         g.P()

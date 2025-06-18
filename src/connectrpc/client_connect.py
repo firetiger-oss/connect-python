@@ -8,7 +8,6 @@ from typing import TypeVar
 import aiohttp
 from google.protobuf.message import Message
 from multidict import CIMultiDict
-from multidict import MultiDict
 
 from .client_base import BaseClient
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
@@ -60,7 +59,7 @@ class ConnectProtocolClient(BaseClient):
             "POST", url, data=data, headers=headers, timeout=timeout
         ) as resp:
             output: ConnectUnaryOutput[T] = ConnectUnaryOutput(
-                response_headers=MultiDict(resp.headers)
+                response_headers=CIMultiDict(resp.headers)
             )
             if resp.status != 200:
                 output._error = await self.unary_error(resp)
@@ -132,7 +131,7 @@ class ConnectProtocolClient(BaseClient):
 
 
 class ConnectUnaryOutput(UnaryOutput[T]):
-    def __init__(self, message: T | None = None, response_headers: MultiDict[str] | None = None):
+    def __init__(self, response_headers: CIMultiDict[str], message: T | None = None):
         self._message = message
         self._response_headers = response_headers
         self._error: ConnectError | None = None
@@ -140,18 +139,24 @@ class ConnectUnaryOutput(UnaryOutput[T]):
     def message(self) -> T | None:
         return self._message
 
-    def response_headers(self) -> MultiDict[str] | None:
+    def response_headers(self) -> CIMultiDict[str]:
+        trailers: CIMultiDict[str] = CIMultiDict()
+
+        for key, value in self._response_headers.items():
+            key_clean = str(key).lower()
+            if key_clean.startswith("trailer-"):
+                # Strip 'trailer-' prefix
+                key_new = key_clean.removeprefix("trailer-")
+                trailers.add(key_new, value)
+
         return self._response_headers
 
     def error(self) -> ConnectError | None:
         return self._error
 
-    def response_trailers(self) -> MultiDict[str] | None:
+    def response_trailers(self) -> CIMultiDict[str]:
         # Connect Unary responses encode trailers in headers
-        if self._response_headers is None:
-            return None
-
-        trailers: MultiDict[str] = MultiDict()
+        trailers: CIMultiDict[str] = CIMultiDict()
         for key, value in self._response_headers.items():
             key_clean = str(key).lower()
             if key_clean.startswith("trailer-"):
@@ -176,7 +181,7 @@ class ConnectStreamOutput(StreamOutput[T]):
         self._response_type = response_type
         self._serde = serde
         self._response_headers = CIMultiDict(response.headers)  # Capture HTTP response headers
-        self._trailing_metadata: dict[str, Any] | None = None
+        self._response_trailers: CIMultiDict[str] = CIMultiDict()
         self._consumed = False
         self._released = False
         self._error: ConnectError | None = None
@@ -202,7 +207,7 @@ class ConnectStreamOutput(StreamOutput[T]):
             if end_stream_response.error is not None:
                 self._error = end_stream_response.error
 
-            self._trailing_metadata = end_stream_response.metadata
+            self._response_trailers = end_stream_response.metadata
             self._consumed = True
             # Stream is now complete - release connection before StopAsyncIteration
             await self.close()
@@ -220,10 +225,10 @@ class ConnectStreamOutput(StreamOutput[T]):
         """Get HTTP response headers from the initial response."""
         return self._response_headers
 
-    def trailing_metadata(self) -> dict[str, Any] | None:
+    def response_trailers(self) -> CIMultiDict[str]:
         if not self._consumed:
             raise RuntimeError("Stream must be fully consumed before accessing trailing metadata")
-        return self._trailing_metadata
+        return self._response_trailers
 
     async def __aenter__(self) -> ConnectStreamOutput[T]:
         """Enter async context manager for automatic resource management."""

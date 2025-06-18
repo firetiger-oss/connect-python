@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
 from typing import TypeVar
 
 from google.protobuf.message import Message
+from multidict import CIMultiDict
 
 from connectrpc.errors import ConnectError
+from connectrpc.errors import ConnectErrorCode
 
 T = TypeVar("T", bound=Message)
 
@@ -15,17 +16,36 @@ T = TypeVar("T", bound=Message)
 @dataclass
 class EndStreamResponse:
     error: ConnectError | None
-    metadata: dict[str, Any] | None
+    metadata: CIMultiDict[str]
 
     @classmethod
     def from_bytes(cls, data: bytes) -> EndStreamResponse:
         data_dict = json.loads(data)
 
-        val = EndStreamResponse(error=None, metadata=None)
+        val = EndStreamResponse(error=None, metadata=CIMultiDict())
         if "error" in data_dict and data_dict["error"] is not None:
             val.error = ConnectError.from_dict(data_dict["error"])
 
         if "metadata" in data_dict:
-            val.metadata = data_dict["metadata"]
+            md = data_dict["metadata"]
+            if not isinstance(md, dict):
+                val.error = ConnectError(
+                    ConnectErrorCode.INTERNAL, "malformed trailer metadata received"
+                )
+                return val
+
+            for k, v in md.items():
+                if not isinstance(k, str):
+                    val.error = ConnectError(
+                        ConnectErrorCode.INTERNAL, "malformed trailer metadata received"
+                    )
+                    return val
+
+                if not isinstance(v, list):
+                    # Be a bit forgiving of this common error.
+                    v = [v]
+
+                for vv in v:
+                    val.metadata.add(k, vv)
 
         return val

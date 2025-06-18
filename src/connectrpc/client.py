@@ -17,6 +17,7 @@ from .debugprint import debug
 from .headers import HeaderInput
 from .streams import StreamInput
 from .streams import StreamOutput
+from .unary import ClientStreamingOutput
 from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
@@ -83,15 +84,16 @@ class ConnectClient:
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> StreamOutput[T]:
+    ) -> ClientStreamingOutput[T]:
         async_iter = self._to_async_iterator(reqs)
-        return await self._client.call_streaming(
+        stream_output = await self._client.call_streaming(
             url,
             async_iter,
             response_type,
             extra_headers=extra_headers,
             timeout_seconds=timeout_seconds,
         )
+        return await ClientStreamingOutput.from_stream_output(stream_output)
 
     async def call_server_streaming(
         self,

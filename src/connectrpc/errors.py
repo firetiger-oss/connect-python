@@ -187,6 +187,11 @@ class ConnectError(Exception):
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in error response: {e}") from e
 
+        if not isinstance(data, dict):
+            return ConnectError(
+                ConnectErrorCode.UNAUTHENTICATED,
+                "invalid error response received",
+            )
         return cls.from_dict(data, http_status)
 
     @classmethod
@@ -203,11 +208,6 @@ class ConnectError(Exception):
         Raises:
             ValueError: If required fields are missing
         """
-        if not isinstance(data, dict):
-            return ConnectError(
-                ConnectErrorCode.UNAUTHENTICATED,
-                "invalid error response received",
-            )
 
         code_name = data.get("code")
         message = data.get("message", "")

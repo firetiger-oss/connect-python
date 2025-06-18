@@ -21,17 +21,12 @@ from connectrpc.conformance.v1.config_pb2 import Code
 from connectrpc.conformance.v1.config_pb2 import Codec
 from connectrpc.conformance.v1.config_pb2 import Protocol
 from connectrpc.conformance.v1.service_pb2 import BidiStreamRequest
-from connectrpc.conformance.v1.service_pb2 import BidiStreamResponse
 from connectrpc.conformance.v1.service_pb2 import ClientStreamRequest
-from connectrpc.conformance.v1.service_pb2 import ClientStreamResponse
 from connectrpc.conformance.v1.service_pb2 import Error
 from connectrpc.conformance.v1.service_pb2 import Header
 from connectrpc.conformance.v1.service_pb2 import ServerStreamRequest
-from connectrpc.conformance.v1.service_pb2 import ServerStreamResponse
 from connectrpc.conformance.v1.service_pb2 import UnaryRequest
-from connectrpc.conformance.v1.service_pb2 import UnaryResponse
 from connectrpc.conformance.v1.service_pb2 import UnimplementedRequest
-from connectrpc.conformance.v1.service_pb2 import UnimplementedResponse
 from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
 from connectrpc.debugprint import debug
 from connectrpc.errors import ConnectError
@@ -75,12 +70,6 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                 | BidiStreamRequest
                 | UnimplementedRequest
             )
-            stream_output: (
-                StreamOutput[ClientStreamResponse]
-                | StreamOutput[ServerStreamResponse]
-                | StreamOutput[BidiStreamResponse]
-            )
-            server_response: UnaryOutput[UnaryResponse] | UnaryOutput[UnimplementedResponse]
 
             if request.method == "Unary":
                 assert len(request.request_messages) == 1
@@ -92,12 +81,12 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
                 response = ClientCompatResponse()
                 response.test_name = request.test_name
-                server_response = await client.call_unary(
+                unary_response = await client.call_unary(
                     request_payload,
                     extra_headers=extra_headers,
                     timeout_seconds=timeout_seconds,
                 )
-                result = result_from_unary_output(server_response)
+                result = result_from_unary_output(unary_response)
                 response.response.MergeFrom(result)
 
             elif request.method == "ServerStream":
@@ -107,12 +96,12 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                 assert req_msg.Is(request_payload.DESCRIPTOR)
                 req_msg.Unpack(request_payload)
 
-                stream_output = await client.call_server_stream(
+                server_stream_output = await client.call_server_stream(
                     request_payload,
                     extra_headers=extra_headers,
                     timeout_seconds=timeout_seconds,
                 )
-                result = await result_from_stream_output(stream_output)
+                result = await result_from_stream_output(server_stream_output)
                 response.response.MergeFrom(result)
 
             elif request.method == "ClientStream":
@@ -124,12 +113,12 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         await asyncio.sleep(request.request_delay_ms / 1000.0)
                         yield req_payload
 
-                stream_output = await client.call_client_stream(
+                client_stream_output = await client.call_client_stream(
                     client_stream_requests(),
                     extra_headers=extra_headers,
                     timeout_seconds=timeout_seconds,
                 )
-                result = await result_from_stream_output(stream_output)
+                result = result_from_unary_output(client_stream_output)
                 response.response.MergeFrom(result)
 
             elif request.method == "BidiStream":
@@ -141,12 +130,12 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                         await asyncio.sleep(request.request_delay_ms / 1000.0)
                         yield req_payload
 
-                stream_output = await client.call_bidi_stream(
+                bidi_stream_output = await client.call_bidi_stream(
                     client_bidi_requests(),
                     extra_headers=extra_headers,
                     timeout_seconds=timeout_seconds,
                 )
-                result = await result_from_stream_output(stream_output)
+                result = await result_from_stream_output(bidi_stream_output)
                 response.response.MergeFrom(result)
 
             elif request.method == "Unimplemented":
@@ -160,12 +149,12 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
 
                 response = ClientCompatResponse()
                 response.test_name = request.test_name
-                server_response = await client.call_unimplemented(
+                unimplemented_response = await client.call_unimplemented(
                     request_payload,
                     extra_headers=extra_headers,
                     timeout_seconds=timeout_seconds,
                 )
-                result = result_from_unary_output(server_response)
+                result = result_from_unary_output(unimplemented_response)
                 response.response.MergeFrom(result)
             else:
                 raise NotImplementedError(f"not implemented: {request.method}")
@@ -188,10 +177,8 @@ async def result_from_stream_output(stream_output: StreamOutput[Any]) -> ClientR
     resp_headers = multidict_to_proto(stream_output.response_headers())
     result.response_headers.extend(resp_headers)
 
-    resp_trailers = stream_output.trailing_metadata()
-    if resp_trailers is not None:
-        resp_trailers_proto = [Header(name=k, value=v) for k, v in resp_trailers.items()]
-        result.response_trailers.extend(resp_trailers_proto)
+    resp_trailers = multidict_to_proto(stream_output.response_trailers())
+    result.response_trailers.extend(resp_trailers)
 
     err = stream_output.error()
     if err is not None:

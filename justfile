@@ -42,6 +42,9 @@ conformance-test *ARGS:
         exit 1
     fi
     cd tests/conformance
+
+    buf generate
+
     connectconformance \
         --conf ./config.yaml \
         --mode client \

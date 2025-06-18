@@ -7,7 +7,7 @@ from typing import Protocol
 from typing import TypeVar
 
 from google.protobuf.message import Message
-from multidict import MultiDict
+from multidict import CIMultiDict
 from typing_extensions import Self
 
 from .errors import ConnectError
@@ -78,13 +78,13 @@ class StreamOutput(Protocol[U]):
         """Return async iterator for the stream messages."""
         ...
 
-    def response_headers(self) -> MultiDict[str]: ...
+    def response_headers(self) -> CIMultiDict[str]: ...
 
-    def trailing_metadata(self) -> dict[str, Any] | None:
+    def response_trailers(self) -> CIMultiDict[str]:
         """Get trailing metadata after stream is fully consumed.
 
         Returns:
-            Dictionary of trailing metadata, or None if no metadata available.
+            case-insensitive multiple-valued dictionary of trailing metadata.
 
         Raises:
             RuntimeError: If called before stream is fully consumed.

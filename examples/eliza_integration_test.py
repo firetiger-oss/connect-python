@@ -135,7 +135,7 @@ async def test_protocol(protocol: ConnectProtocol, protocol_name: str) -> list[b
         results.append(await test_say(client, protocol_name))
         results.append(await test_introduce(client, protocol_name))
         results.append(await test_converse(client, protocol_name))
-        results.append(await test_call_introduce(client, protocol_name))        
+        results.append(await test_call_introduce(client, protocol_name))
 
         return results
 
