@@ -50,59 +50,59 @@ service ElizaService {
 Then the generated client will have methods like this (optional arguments have been elided for clarity):
 ```python
 class ElizaServiceClient:
-	def __init__(self, base_url: str, http_client: aiohttp.ClientSession):
-		...
+    def __init__(self, base_url: str, http_client: aiohttp.ClientSession):
+        ...
 
-	# Unary (no streams)
-	async def say(self, req: eliza_pb2.SayRequest) -> eliza_pb2.SayResponse:
-		...
-		
-	# Bidirectional (both sides stream)
-	def converse(self, req: StreamInput[eliza_pb2.ConverseRequest]) -> AsyncIterator[eliza_pb2.SayResponse]:
-		...
-		
-	# Server streaming (client sends one message, server sends a stream)
-	def introduce(self, req: eliza_pb2.IntroduceRequest) -> AsyncIterator[eliza_pb2.IntroduceResponse]:
-		...
-		
-	# Client streaming (client sends a stream, server sends one message back)
-	def pontificate(self, req: StreamInput[eliza_pb2.PontificateRequest]) -> eliza_pb2.PontificateResponse]:
-		...
+    # Unary (no streams)
+    async def say(self, req: eliza_pb2.SayRequest) -> eliza_pb2.SayResponse:
+        ...
+        
+    # Bidirectional (both sides stream)
+    def converse(self, req: StreamInput[eliza_pb2.ConverseRequest]) -> AsyncIterator[eliza_pb2.SayResponse]:
+        ...
+        
+    # Server streaming (client sends one message, server sends a stream)
+    def introduce(self, req: eliza_pb2.IntroduceRequest) -> AsyncIterator[eliza_pb2.IntroduceResponse]:
+        ...
+        
+    # Client streaming (client sends a stream, server sends one message back)
+    def pontificate(self, req: StreamInput[eliza_pb2.PontificateRequest]) -> eliza_pb2.PontificateResponse]:
+        ...
 ```
 
 which you can use like this:
 
 ```python
 async def main():
-	with aiohttp.ClientSession() as http_client:
-		eliza_client = ElizaServiceClient("https://demo.connectrpc.com")
-		
-		# Unary responses: await and get the response message back
-		response = await eliza_client.say(eliza_pb2.SayRequest(sentence="Hello, Eliza!"))
-		print(f"  Eliza says: {response.sentence}")
-		
-		# Streaming responses: use async for to iterate over messages in the stream
-	    req = eliza_pb2.IntroduceRequest(name="Henry")
-		async for response in eliza_client.introduce(req):
-		    print(f"   Eliza: {response.sentence}")
-			
-		# Streaming requests: send an iterator, get a single message
-		requests = [
-		    eliza_pb2.PontificateRequest(sentence="I have many things on my mind."),
-			eliza_pb2.PontificateRequest(sentence="But I will save them for later."),
-		]
-		response = await eliza_client.pontificate(requests)
-		print("    Eliza responds: {response.sentence}")
-			
-		# Bidirectional RPCs: send an iterator, get an iterator
-		requests = [
-		    eliza_pb2.ConverseRequest(sentence="I have been having trouble communicating."),
-			eliza_pb2.ConverseRequest(sentence="But structured RPCs are pretty great!"),
-			eliza_pb2.ConverseRequest(sentence="What do you think?")
-		]
-		async for response in eliza_client.converse(requests):
-		    print("    Eliza: {response.sentence}")
-		
+    with aiohttp.ClientSession() as http_client:
+        eliza_client = ElizaServiceClient("https://demo.connectrpc.com")
+        
+        # Unary responses: await and get the response message back
+        response = await eliza_client.say(eliza_pb2.SayRequest(sentence="Hello, Eliza!"))
+        print(f"  Eliza says: {response.sentence}")
+        
+        # Streaming responses: use async for to iterate over messages in the stream
+        req = eliza_pb2.IntroduceRequest(name="Henry")
+        async for response in eliza_client.introduce(req):
+            print(f"   Eliza: {response.sentence}")
+            
+        # Streaming requests: send an iterator, get a single message
+        requests = [
+            eliza_pb2.PontificateRequest(sentence="I have many things on my mind."),
+            eliza_pb2.PontificateRequest(sentence="But I will save them for later."),
+        ]
+        response = await eliza_client.pontificate(requests)
+        print("    Eliza responds: {response.sentence}")
+            
+        # Bidirectional RPCs: send an iterator, get an iterator
+        requests = [
+            eliza_pb2.ConverseRequest(sentence="I have been having trouble communicating."),
+            eliza_pb2.ConverseRequest(sentence="But structured RPCs are pretty great!"),
+            eliza_pb2.ConverseRequest(sentence="What do you think?")
+        ]
+        async for response in eliza_client.converse(requests):
+            print("    Eliza: {response.sentence}")
+        
 ```
 
 ### Advanced usage
@@ -130,7 +130,7 @@ the timeout will be used in two ways:
     will be informed of the deadline you have set.
  2. `aiohttp` will be informed, and will close the request if the
     timeout expires.
-	
+    
 So for example:
 ```python
 eliza_client.say(req, timeout_seconds=2.5)
@@ -183,10 +183,10 @@ messages = []
 output = await eliza_client.call_introduce(req)
 async with output as stream:
     async for response in stream:
-	    # each element in stream is the protobuf message type, 
-		# already deserialized
-	    messages.append(response.sentence)
-		
+        # each element in stream is the protobuf message type, 
+        # already deserialized
+        messages.append(response.sentence)
+        
 if output.error() is not None:
     raise output.error()
 ```
