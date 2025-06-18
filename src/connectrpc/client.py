@@ -35,12 +35,9 @@ class ConnectClient:
 
     def __init__(
         self,
-        http_client: aiohttp.ClientSession | None = None,
+        http_client: aiohttp.ClientSession,
         protocol: ConnectProtocol = ConnectProtocol.CONNECT_PROTOBUF,
     ):
-        if http_client is None:
-            http_client = aiohttp.ClientSession()
-
         if protocol == ConnectProtocol.CONNECT_PROTOBUF:
             self._client = ConnectProtocolClient(http_client, CONNECT_PROTOBUF_SERIALIZATION)
         elif protocol == ConnectProtocol.CONNECT_JSON:

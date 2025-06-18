@@ -18,7 +18,7 @@ class ConformanceServiceClient:
     def __init__(
         self,
         base_url: str,
-        http_client: aiohttp.ClientSession | None = None,
+        http_client: aiohttp.ClientSession,
         protocol: ConnectProtocol = ConnectProtocol.CONNECT_PROTOBUF,
     ):
         self.base_url = base_url

@@ -205,7 +205,7 @@ def generate(gen: protogen.Plugin) -> None:
             g.P("def __init__(")
             g.P("    self,")
             g.P("    base_url: str,")
-            g.P("    http_client: aiohttp.ClientSession | None = None,")
+            g.P("    http_client: aiohttp.ClientSession,")
             g.P("    protocol: ConnectProtocol = ConnectProtocol.CONNECT_PROTOBUF,")
             g.P("):")
             g.P("    self.base_url = base_url")
