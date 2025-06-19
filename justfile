@@ -36,7 +36,7 @@ generate:
     cd examples && buf generate    
 
 # Run conformance tests (requires connectconformance binary). Usage: just conformance-test [ARGS...]
-conformance-test *ARGS: generate
+conformance-test *ARGS: 
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v connectconformance &> /dev/null; then

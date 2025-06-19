@@ -9,6 +9,7 @@ from multidict import CIMultiDict
 from .errors import ConnectError
 from .errors import ConnectErrorCode
 from .streams import StreamOutput
+from .streams import SynchronousStreamOutput
 
 T = TypeVar("T", bound=Message, covariant=True)
 
@@ -43,7 +44,47 @@ class ClientStreamingOutput(UnaryOutput[T]):
         self._error = error
 
     @classmethod
-    async def from_stream_output(cls, stream_output: StreamOutput[T]) -> ClientStreamingOutput[T]:
+    def from_stream_output(
+        cls, stream_output: SynchronousStreamOutput[T]
+    ) -> ClientStreamingOutput[T]:
+        response: T | None = None
+        error: ConnectError | None = None
+        for msg in stream_output:
+            if response is not None:
+                # The server should only give us exactly one
+                # response. If we got multiple, we should abort;
+                # ignore trailers encoded in the stream.
+                empty_trailers: CIMultiDict[str] = CIMultiDict()
+                return cls(
+                    message=None,
+                    headers=stream_output.response_headers(),
+                    trailers=empty_trailers,
+                    error=ConnectError(
+                        ConnectErrorCode.UNIMPLEMENTED,
+                        "server responded with multiple messages; expecting exactly one",
+                    ),
+                )
+            response = msg
+
+        if response is None:
+            error = stream_output.error()
+            if error is None:
+                error = ConnectError(
+                    ConnectErrorCode.UNIMPLEMENTED,
+                    "server responded with zero messages; expecting exactly one",
+                )
+
+        return cls(
+            message=response,
+            headers=stream_output.response_headers(),
+            trailers=stream_output.response_trailers(),
+            error=error,
+        )
+
+    @classmethod
+    async def from_async_stream_output(
+        cls, stream_output: StreamOutput[T]
+    ) -> ClientStreamingOutput[T]:
         response: T | None = None
         error: ConnectError | None = None
 

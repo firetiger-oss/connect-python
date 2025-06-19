@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator
-from collections.abc import Iterator
+from collections.abc import Iterable
 from typing import Protocol
 from typing import TypeVar
 
@@ -7,9 +7,30 @@ from google.protobuf.message import Message
 
 from .headers import HeaderInput
 from .streams import StreamOutput
+from .streams import SynchronousStreamOutput
 from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
+
+
+class BaseClient(Protocol):
+    def call_unary(
+        self,
+        url: str,
+        req: Message,
+        response_type: type[T],
+        extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
+    ) -> UnaryOutput[T]: ...
+
+    def call_streaming(
+        self,
+        url: str,
+        reqs: Iterable[Message],
+        response_type: type[T],
+        extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
+    ) -> SynchronousStreamOutput[T]: ...
 
 
 class AsyncBaseClient(Protocol):
@@ -26,26 +47,6 @@ class AsyncBaseClient(Protocol):
         self,
         url: str,
         reqs: AsyncIterator[Message],
-        response_type: type[T],
-        extra_headers: HeaderInput | None = None,
-        timeout_seconds: float | None = None,
-    ) -> StreamOutput[T]: ...
-
-
-class SynchronousBaseClient(Protocol[T]):
-    def call_unary_sync(
-        self,
-        url: str,
-        req: Message,
-        response_type: type[T],
-        extra_headers: HeaderInput | None = None,
-        timeout_seconds: float | None = None,
-    ) -> UnaryOutput[T]: ...
-
-    def call_streaming_sync(
-        self,
-        url: str,
-        reqs: Iterator[Message],
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,

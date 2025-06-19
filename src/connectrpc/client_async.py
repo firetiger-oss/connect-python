@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from enum import Enum
 from typing import TypeVar
 
 import aiohttp
@@ -11,6 +10,7 @@ from .client_base import AsyncBaseClient
 from .client_connect import AsyncConnectProtocolClient
 from .client_grpc import AsyncConnectGRPCClient
 from .client_grpc_web import AsyncConnectGRPCWebClient
+from .client_protocol import ConnectProtocol
 from .connect_serialization import CONNECT_JSON_SERIALIZATION
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .debugprint import debug
@@ -21,13 +21,6 @@ from .unary import ClientStreamingOutput
 from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
-
-
-class ConnectProtocol(Enum):
-    CONNECT_PROTOBUF = "connect-proto"
-    CONNECT_JSON = "connect-json"
-    GRPC = "grpc"
-    GRPC_WEB = "grpc-web"
 
 
 class AsyncConnectClient:
@@ -90,7 +83,7 @@ class AsyncConnectClient:
             extra_headers=extra_headers,
             timeout_seconds=timeout_seconds,
         )
-        return await ClientStreamingOutput.from_stream_output(stream_output)
+        return await ClientStreamingOutput.from_async_stream_output(stream_output)
 
     async def call_server_streaming(
         self,

@@ -12,8 +12,8 @@ import google.protobuf.descriptor_pb2  # noqa: F401
 from google.protobuf.any_pb2 import Any as ProtoAny
 from multidict import MultiDict
 
-from connectrpc.client import ConnectProtocol
 from connectrpc.client_connect import UnexpectedContentType
+from connectrpc.client_protocol import ConnectProtocol
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatRequest
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatResponse
 from connectrpc.conformance.v1.client_compat_pb2 import ClientResponseResult
@@ -101,7 +101,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     extra_headers=extra_headers,
                     timeout_seconds=timeout_seconds,
                 )
-                result = await result_from_stream_output(server_stream_output)
+                result = await result_from_async_stream_output(server_stream_output)
                 response.response.MergeFrom(result)
 
             elif request.method == "ClientStream":
@@ -135,7 +135,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
                     extra_headers=extra_headers,
                     timeout_seconds=timeout_seconds,
                 )
-                result = await result_from_stream_output(bidi_stream_output)
+                result = await result_from_async_stream_output(bidi_stream_output)
                 response.response.MergeFrom(result)
 
             elif request.method == "Unimplemented":
@@ -168,7 +168,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
         return response
 
 
-async def result_from_stream_output(stream_output: StreamOutput[Any]) -> ClientResponseResult:
+async def result_from_async_stream_output(stream_output: StreamOutput[Any]) -> ClientResponseResult:
     result = ClientResponseResult()
     async with stream_output as stream:
         async for server_msg in stream:

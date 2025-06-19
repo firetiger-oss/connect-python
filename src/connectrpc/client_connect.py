@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import struct
 from collections.abc import AsyncIterator
+from collections.abc import Iterable
 from typing import Any
 from typing import TypeVar
 
 import aiohttp
+import urllib3
 from google.protobuf.message import Message
 from multidict import CIMultiDict
 
 from .client_base import AsyncBaseClient
+from .client_base import BaseClient
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .connect_serialization import ConnectSerialization
 from .debugprint import debug
@@ -17,10 +20,40 @@ from .errors import ConnectError
 from .headers import HeaderInput
 from .headers import merge_headers
 from .streams import StreamOutput
+from .streams import SynchronousStreamOutput
 from .streams_connect import EndStreamResponse
 from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
+
+
+class ConnectProtocolClient(BaseClient):
+    def __init__(
+        self,
+        http_client: urllib3.PoolManager,
+        serialization: ConnectSerialization = CONNECT_PROTOBUF_SERIALIZATION,
+    ):
+        raise NotImplementedError
+
+    def call_unary(
+        self,
+        url: str,
+        req: Message,
+        response_type: type[T],
+        extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
+    ) -> UnaryOutput[T]:
+        raise NotImplementedError
+
+    def call_streaming(
+        self,
+        url: str,
+        reqs: Iterable[Message],
+        response_type: type[T],
+        extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
+    ) -> SynchronousStreamOutput[T]:
+        raise NotImplementedError
 
 
 class AsyncConnectProtocolClient(AsyncBaseClient):
