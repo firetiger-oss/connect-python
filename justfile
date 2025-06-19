@@ -31,6 +31,10 @@ integration-test:
 protoc-gen *ARGS:
     protoc --plugin=protoc-gen-connect_python=.venv/bin/protoc-gen-connect_python {{ARGS}}
 
+generate:
+    cd tests/conformance && buf generate
+    cd examples && buf generate    
+
 # Run conformance tests (requires connectconformance binary). Usage: just conformance-test [ARGS...]
 conformance-test *ARGS:
     #!/usr/bin/env bash

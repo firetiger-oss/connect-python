@@ -49,7 +49,7 @@ service ElizaService {
 
 Then the generated client will have methods like this (optional arguments have been elided for clarity):
 ```python
-class ElizaServiceClient:
+class AsyncElizaServiceClient:
     def __init__(self, base_url: str, http_client: aiohttp.ClientSession):
         ...
 
@@ -75,7 +75,7 @@ which you can use like this:
 ```python
 async def main():
     with aiohttp.ClientSession() as http_client:
-        eliza_client = ElizaServiceClient("https://demo.connectrpc.com")
+        eliza_client = AsyncElizaServiceClient("https://demo.connectrpc.com")
         
         # Unary responses: await and get the response message back
         response = await eliza_client.say(eliza_pb2.SayRequest(sentence="Hello, Eliza!"))

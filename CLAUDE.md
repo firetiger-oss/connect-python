@@ -27,7 +27,7 @@ async for response in stream:
 **Key Insight**: Being honest about async nature of connection establishment improves resource management.
 
 ### Integration Testing Pattern
-- **Service wrapper**: `ElizaServiceClient` wraps generic `AsyncConnectClient` with typed methods
+- **Service wrapper**: `AsyncElizaServiceClient` wraps generic `AsyncConnectClient` with typed methods
 - **Dual API design**: Simple async iterators + advanced stream methods with metadata
 - **CLI protocol selection**: `--protocols connect-proto connect-json grpc grpc-web`
 - **Comprehensive RPC coverage**: Unary, server streaming, bidirectional streaming
@@ -126,7 +126,7 @@ metadata = stream.trailing_metadata()  # Returns Optional[dict], raises if not c
 - StreamOutput API: ✅ Complete with resource management (Dec 2024)
 - Connection lifecycle: ✅ Fixed (release vs close, context managers, exception safety)
 - Dual API design: ✅ Complete (simple + stream methods) (Dec 2024)
-- Service wrapper pattern: ✅ Demonstrated with ElizaServiceClient
+- Service wrapper pattern: ✅ Demonstrated with AsyncElizaServiceClient
 - Other protocol clients: ❌ Stubs (`NotImplementedError`)
 
 ### Resource Management Lessons Learned (Dec 2024)

@@ -200,7 +200,7 @@ def generate(gen: protogen.Plugin) -> None:
         g.P()
 
         for s in f.services:
-            g.P("class ", protogen.PyIdent(import_path, s.proto.name), "Client:")
+            g.P("class Async", protogen.PyIdent(import_path, s.proto.name), "Client:")
             g.set_indent(4)
             g.P("def __init__(")
             g.P("    self,")

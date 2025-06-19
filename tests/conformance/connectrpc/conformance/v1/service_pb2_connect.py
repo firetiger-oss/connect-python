@@ -14,7 +14,7 @@ from connectrpc.unary import ClientStreamingOutput
 
 import connectrpc.conformance.v1.service_pb2
 
-class ConformanceServiceClient:
+class AsyncConformanceServiceClient:
     def __init__(
         self,
         base_url: str,

@@ -27,7 +27,7 @@ from connectrpc.conformance.v1.service_pb2 import Header
 from connectrpc.conformance.v1.service_pb2 import ServerStreamRequest
 from connectrpc.conformance.v1.service_pb2 import UnaryRequest
 from connectrpc.conformance.v1.service_pb2 import UnimplementedRequest
-from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
+from connectrpc.conformance.v1.service_pb2_connect import AsyncConformanceServiceClient
 from connectrpc.debugprint import debug
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
@@ -56,7 +56,7 @@ async def handle(request: ClientCompatRequest) -> ClientCompatResponse:
             else:
                 raise NotImplementedError
 
-            client = ConformanceServiceClient(
+            client = AsyncConformanceServiceClient(
                 base_url="http://" + request.host + ":" + str(request.port),
                 http_client=http_session,
                 protocol=protocol,

@@ -5,12 +5,12 @@ import sys
 
 import aiohttp
 import eliza_pb2  # type: ignore[import-not-found]
-from eliza_pb2_connect import ElizaServiceClient  # type: ignore[import-not-found]
+from eliza_pb2_connect import AsyncElizaServiceClient  # type: ignore[import-not-found]
 
 from connectrpc.client import ConnectProtocol
 
 
-async def test_say(client: ElizaServiceClient, protocol_name: str) -> bool:
+async def test_say(client: AsyncElizaServiceClient, protocol_name: str) -> bool:
     """Test the Say unary RPC method"""
     print(f"  [{protocol_name}] Testing Say method...")
 
@@ -30,7 +30,7 @@ async def test_say(client: ElizaServiceClient, protocol_name: str) -> bool:
         return False
 
 
-async def test_introduce(client: ElizaServiceClient, protocol_name: str) -> bool:
+async def test_introduce(client: AsyncElizaServiceClient, protocol_name: str) -> bool:
     """Test the Introduce server streaming RPC method"""
     print(f"  [{protocol_name}] Testing Introduce method...")
 
@@ -54,7 +54,7 @@ async def test_introduce(client: ElizaServiceClient, protocol_name: str) -> bool
         raise
 
 
-async def test_converse(client: ElizaServiceClient, protocol_name: str) -> bool:
+async def test_converse(client: AsyncElizaServiceClient, protocol_name: str) -> bool:
     """Test the Converse bidirectional streaming RPC method"""
     print(f"  [{protocol_name}] Testing Converse method...")
 
@@ -87,7 +87,7 @@ async def test_converse(client: ElizaServiceClient, protocol_name: str) -> bool:
         raise
 
 
-async def test_call_introduce(client: ElizaServiceClient, protocol_name: str) -> bool:
+async def test_call_introduce(client: AsyncElizaServiceClient, protocol_name: str) -> bool:
     """Test the Introduce server streaming RPC method with metadata access"""
     print(f"  [{protocol_name}] Testing Introduce stream method with metadata...")
 
@@ -125,7 +125,7 @@ async def test_protocol(protocol: ConnectProtocol, protocol_name: str) -> list[b
     print("-" * 50)
 
     async with aiohttp.ClientSession() as session:
-        client = ElizaServiceClient(
+        client = AsyncElizaServiceClient(
             base_url="https://demo.connectrpc.com",
             http_client=session,
             protocol=protocol,
