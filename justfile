@@ -25,7 +25,7 @@ test:
 
 # Run integration test against demo.connectrpc.com
 integration-test:
-    cd examples && uv run python eliza_integration_test.py --protocols connect-proto connect-json
+    cd examples && uv run python eliza_async_integration_test.py --protocols connect-proto connect-json
 
 # Run protoc with connect_python plugin (development mode). usage: just protoc-gen [PROTOC_ARGS...]
 protoc-gen *ARGS:
@@ -36,7 +36,7 @@ generate:
     cd examples && buf generate    
 
 # Run conformance tests (requires connectconformance binary). Usage: just conformance-test [ARGS...]
-conformance-test *ARGS:
+conformance-test *ARGS: generate
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v connectconformance &> /dev/null; then
@@ -46,8 +46,6 @@ conformance-test *ARGS:
         exit 1
     fi
     cd tests/conformance
-
-    buf generate
 
     connectconformance \
         --conf ./config.yaml \
