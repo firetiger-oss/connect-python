@@ -3,7 +3,7 @@
 from collections.abc import AsyncIterator
 import aiohttp
 
-from connectrpc.client import ConnectClient
+from connectrpc.client import AsyncConnectClient
 from connectrpc.client import ConnectProtocol
 from connectrpc.client_connect import ConnectProtocolError
 from connectrpc.headers import HeaderInput
@@ -22,7 +22,7 @@ class ConformanceServiceClient:
         protocol: ConnectProtocol = ConnectProtocol.CONNECT_PROTOBUF,
     ):
         self.base_url = base_url
-        self._connect_client = ConnectClient(http_client, protocol)
+        self._connect_client = AsyncConnectClient(http_client, protocol)
 
     async def call_unary(
         self, req: connectrpc.conformance.v1.service_pb2.UnaryRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None

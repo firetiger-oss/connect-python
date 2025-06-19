@@ -187,7 +187,7 @@ def generate(gen: protogen.Plugin) -> None:
         g.P("from collections.abc import AsyncIterator")
         g.P("import aiohttp")
         g.P()
-        g.P("from connectrpc.client import ConnectClient")
+        g.P("from connectrpc.client import AsyncConnectClient")
         g.P("from connectrpc.client import ConnectProtocol")
         g.P("from connectrpc.client_connect import ConnectProtocolError")
         g.P("from connectrpc.headers import HeaderInput")
@@ -209,7 +209,7 @@ def generate(gen: protogen.Plugin) -> None:
             g.P("    protocol: ConnectProtocol = ConnectProtocol.CONNECT_PROTOBUF,")
             g.P("):")
             g.P("    self.base_url = base_url")
-            g.P("    self._connect_client = ConnectClient(http_client, protocol)")
+            g.P("    self._connect_client = AsyncConnectClient(http_client, protocol)")
             g.P()
 
             # Generate methods for each RPC

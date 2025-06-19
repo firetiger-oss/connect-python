@@ -12,7 +12,7 @@ from .unary import UnaryOutput
 T = TypeVar("T", bound=Message)
 
 
-class ConnectGRPCWebClient(AsyncBaseClient):
+class AsyncConnectGRPCWebClient(AsyncBaseClient):
     def __init__(self, http_client: aiohttp.ClientSession):
         raise NotImplementedError
 

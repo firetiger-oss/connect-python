@@ -31,11 +31,15 @@ class AsyncBaseClient(Protocol):
         timeout_seconds: float | None = None,
     ) -> StreamOutput[T]: ...
 
+
 class SynchronousBaseClient(Protocol[T]):
     def call_unary_sync(
-            self, url: str, req: Message, response_type: type[T], 
-            extra_headers: HeaderInput | None = None,
-            timeout_seconds: float | None = None,
+        self,
+        url: str,
+        req: Message,
+        response_type: type[T],
+        extra_headers: HeaderInput | None = None,
+        timeout_seconds: float | None = None,
     ) -> UnaryOutput[T]: ...
 
     def call_streaming_sync(

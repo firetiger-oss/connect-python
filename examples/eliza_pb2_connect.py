@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 import aiohttp
 import eliza_pb2
 
-from connectrpc.client import ConnectClient
+from connectrpc.client import AsyncConnectClient
 from connectrpc.client import ConnectProtocol
 from connectrpc.client_connect import ConnectProtocolError
 from connectrpc.headers import HeaderInput
@@ -22,7 +22,7 @@ class ElizaServiceClient:
         protocol: ConnectProtocol = ConnectProtocol.CONNECT_PROTOBUF,
     ):
         self.base_url = base_url
-        self._connect_client = ConnectClient(http_client, protocol)
+        self._connect_client = AsyncConnectClient(http_client, protocol)
 
     async def call_say(
         self,

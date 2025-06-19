@@ -23,7 +23,7 @@ from .unary import UnaryOutput
 T = TypeVar("T", bound=Message)
 
 
-class ConnectProtocolClient(AsyncBaseClient):
+class AsyncConnectProtocolClient(AsyncBaseClient):
     def __init__(
         self,
         http_client: aiohttp.ClientSession,
@@ -48,13 +48,13 @@ class ConnectProtocolClient(AsyncBaseClient):
             ]
         )
         headers = merge_headers(headers, extra_headers)
-        debug("ConnectProtocolClient.call_unary timeout_seconds=", timeout_seconds)
+        debug("AsyncConnectProtocolClient.call_unary timeout_seconds=", timeout_seconds)
         if timeout_seconds is not None and timeout_seconds > 0:
             headers["Connect-Timeout-Ms"] = str(int(timeout_seconds * 1000))
             timeout = aiohttp.ClientTimeout(total=timeout_seconds)
         else:
             timeout = aiohttp.ClientTimeout(total=None)
-        debug("ConnectProtocolClient.call_unary timeout=", timeout)
+        debug("AsyncConnectProtocolClient.call_unary timeout=", timeout)
         async with self._http_client.request(
             "POST", url, data=data, headers=headers, timeout=timeout
         ) as resp:

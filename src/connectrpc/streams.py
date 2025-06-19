@@ -111,6 +111,7 @@ class StreamOutput(Protocol[U]):
         """
         ...
 
+
 class SynchronousStreamOutput(Protocol[U]):
     def response_headers(self) -> CIMultiDict[str]: ...
 
@@ -125,9 +126,8 @@ class SynchronousStreamOutput(Protocol[U]):
     def __enter__(self) -> Self: ...
 
     def __exit__(
-            self,
+        self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: Any,
     ) -> None: ...
-

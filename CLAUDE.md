@@ -4,7 +4,7 @@
 
 ### Client API Architecture
 - **Protocol-based design**: `BaseClient` protocol with concrete implementations
-- **Facade pattern**: `ConnectClient` delegates to protocol-specific implementations
+- **Facade pattern**: `AsyncConnectClient` delegates to protocol-specific implementations
 - **Method-level generics**: Each call specifies its own response type vs class-level generics
 - **Duck typing for streams**: `StreamInput = Union[AsyncIterator[T], Iterable[T]]` allows lists, generators, async iterators
 
@@ -27,7 +27,7 @@ async for response in stream:
 **Key Insight**: Being honest about async nature of connection establishment improves resource management.
 
 ### Integration Testing Pattern
-- **Service wrapper**: `ElizaServiceClient` wraps generic `ConnectClient` with typed methods
+- **Service wrapper**: `ElizaServiceClient` wraps generic `AsyncConnectClient` with typed methods
 - **Dual API design**: Simple async iterators + advanced stream methods with metadata
 - **CLI protocol selection**: `--protocols connect-proto connect-json grpc grpc-web`
 - **Comprehensive RPC coverage**: Unary, server streaming, bidirectional streaming
@@ -69,7 +69,7 @@ async with await client.converse_stream(requests) as stream:
 
 **Architecture Decision**: 
 - `BaseClient` protocol: Only `async call_unary()` and `async call_streaming()` 
-- `ConnectClient`: Implements streaming variants by calling protocol methods:
+- `AsyncConnectClient`: Implements streaming variants by calling protocol methods:
   - `call_client_streaming()` → `await call_streaming()` + return first response
   - `call_server_streaming()` → wrap single request + `await call_streaming()`  
   - `call_bidirectional_streaming()` → direct `await call_streaming()`
@@ -158,9 +158,9 @@ metadata = stream.trailing_metadata()  # Returns Optional[dict], raises if not c
 - ✅ No resource leaks: Automatic cleanup in simple methods  
 - ✅ Advanced features available: Trailing metadata access via `_stream` methods
 - ✅ Backward compatibility: Advanced users can still access full StreamOutput
-- ✅ Service-level implementation: No changes needed to core ConnectClient library
+- ✅ Service-level implementation: No changes needed to core AsyncConnectClient library
 
-**Architecture Decision**: This dual approach can be implemented entirely in service wrapper layers, allowing different services to choose their preferred API style without changing the underlying ConnectClient protocol interface.
+**Architecture Decision**: This dual approach can be implemented entirely in service wrapper layers, allowing different services to choose their preferred API style without changing the underlying AsyncConnectClient protocol interface.
 
 **Next**: Implement actual protocol clients (ConnectJSON, gRPC, gRPC-Web)
 

@@ -79,7 +79,7 @@ This document outlines the specific issues that need to be fixed to pass the Con
 **Expected behavior**: Should handle bidirectional message exchange, including half-duplex mode where client sends all messages before reading responses
 
 **Fix needed**:
-1. Verify bidirectional streaming implementation in `ConnectProtocolClient`
+1. Verify bidirectional streaming implementation in `AsyncConnectProtocolClient`
 2. Ensure conformance client properly handles request/response flow
 3. Add support for half-duplex mode (send all requests, then read all responses)
 

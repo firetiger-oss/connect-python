@@ -8,9 +8,9 @@ import aiohttp
 from google.protobuf.message import Message
 
 from .client_base import AsyncBaseClient
-from .client_connect import ConnectProtocolClient
-from .client_grpc import ConnectGRPCClient
-from .client_grpc_web import ConnectGRPCWebClient
+from .client_connect import AsyncConnectProtocolClient
+from .client_grpc import AsyncConnectGRPCClient
+from .client_grpc_web import AsyncConnectGRPCWebClient
 from .connect_serialization import CONNECT_JSON_SERIALIZATION
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .debugprint import debug
@@ -30,7 +30,7 @@ class ConnectProtocol(Enum):
     GRPC_WEB = "grpc-web"
 
 
-class ConnectClient:
+class AsyncConnectClient:
     _client: AsyncBaseClient
 
     def __init__(
@@ -39,13 +39,13 @@ class ConnectClient:
         protocol: ConnectProtocol = ConnectProtocol.CONNECT_PROTOBUF,
     ):
         if protocol == ConnectProtocol.CONNECT_PROTOBUF:
-            self._client = ConnectProtocolClient(http_client, CONNECT_PROTOBUF_SERIALIZATION)
+            self._client = AsyncConnectProtocolClient(http_client, CONNECT_PROTOBUF_SERIALIZATION)
         elif protocol == ConnectProtocol.CONNECT_JSON:
-            self._client = ConnectProtocolClient(http_client, CONNECT_JSON_SERIALIZATION)
+            self._client = AsyncConnectProtocolClient(http_client, CONNECT_JSON_SERIALIZATION)
         elif protocol == ConnectProtocol.GRPC:
-            self._client = ConnectGRPCClient(http_client)
+            self._client = AsyncConnectGRPCClient(http_client)
         elif protocol == ConnectProtocol.GRPC_WEB:
-            self._client = ConnectGRPCWebClient(http_client)
+            self._client = AsyncConnectGRPCWebClient(http_client)
 
     def _to_async_iterator(self, input_stream: StreamInput[T]) -> AsyncIterator[T]:
         """Convert various input types to AsyncIterator"""
@@ -68,8 +68,8 @@ class ConnectClient:
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
     ) -> UnaryOutput[T]:
-        debug("ConnectClient.call_unary timeout=", timeout_seconds)
-        debug("ConnectClient._client=", self._client)
+        debug("AsyncConnectClient.call_unary timeout=", timeout_seconds)
+        debug("AsyncConnectClient._client=", self._client)
         return await self._client.call_unary(
             url, req, response_type, extra_headers=extra_headers, timeout_seconds=timeout_seconds
         )
