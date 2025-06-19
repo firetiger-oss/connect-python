@@ -9,7 +9,7 @@ import aiohttp
 from google.protobuf.message import Message
 from multidict import CIMultiDict
 
-from .client_base import BaseClient
+from .client_base import AsyncBaseClient
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .connect_serialization import ConnectSerialization
 from .debugprint import debug
@@ -23,7 +23,7 @@ from .unary import UnaryOutput
 T = TypeVar("T", bound=Message)
 
 
-class ConnectProtocolClient(BaseClient):
+class ConnectProtocolClient(AsyncBaseClient):
     def __init__(
         self,
         http_client: aiohttp.ClientSession,

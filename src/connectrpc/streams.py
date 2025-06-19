@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from collections.abc import Iterable
+from collections.abc import Iterator
 from typing import Any
 from typing import Protocol
 from typing import TypeVar
@@ -49,29 +50,6 @@ class StreamOutput(Protocol[U]):
        finally:
            await stream.close()  # Explicit cleanup required
        ```
-
-    ## For Implementers
-
-    Implementations must:
-    - Support async iteration protocol (__aiter__)
-    - Provide trailing metadata access after consumption
-    - Implement async context manager protocol for automatic cleanup
-    - Provide explicit close() method for manual cleanup
-    - Ensure connection resources are released exactly once
-    - Handle cleanup on normal completion, early termination, and exceptions
-
-    ## Connection Lifecycle
-
-    - Connection resources (HTTP connections, sockets, etc.) should be acquired
-      lazily when iteration begins
-    - Resources must be released when:
-      * Stream is fully consumed (normal completion)
-      * Context manager exits (__aexit__)
-      * close() method is called explicitly
-      * An exception occurs during streaming
-    - Resources should be returned to connection pools when possible (use
-      release() rather than close() for HTTP connections)
-    - Multiple calls to cleanup methods should be safe (idempotent)
     """
 
     def __aiter__(self) -> AsyncIterator[U]:
@@ -132,3 +110,24 @@ class StreamOutput(Protocol[U]):
         ```
         """
         ...
+
+class SynchronousStreamOutput(Protocol[U]):
+    def response_headers(self) -> CIMultiDict[str]: ...
+
+    def response_trailers(self) -> CIMultiDict[str]: ...
+
+    def __iter__(self) -> Iterator[U]: ...
+
+    def error(self) -> ConnectError | None: ...
+
+    def close(self) -> None: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(
+            self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None: ...
+

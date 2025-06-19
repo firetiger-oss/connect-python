@@ -4,7 +4,7 @@ from typing import TypeVar
 import aiohttp
 from google.protobuf.message import Message
 
-from .client_base import BaseClient
+from .client_base import AsyncBaseClient
 from .headers import HeaderInput
 from .streams import StreamOutput
 from .unary import UnaryOutput
@@ -12,7 +12,7 @@ from .unary import UnaryOutput
 T = TypeVar("T", bound=Message)
 
 
-class ConnectGRPCWebClient(BaseClient):
+class ConnectGRPCWebClient(AsyncBaseClient):
     def __init__(self, http_client: aiohttp.ClientSession):
         raise NotImplementedError
 
