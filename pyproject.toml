@@ -87,6 +87,10 @@ module = "connectrpc.conformance.v1.client_compat_pb2"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
+module = "connectrpc.conformance.v1.server_compat_pb2"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
 module = "connectrpc.conformance.v1.config_pb2"
 ignore_errors = true
 

@@ -5,7 +5,7 @@ mypy-package:
     mypy --package connectrpc
 
 mypy-tests:
-    MYPYPATH=tests/conformance mypy --module conformance_client --module connectrpc.conformance.v1.service_pb2_connect
+    MYPYPATH=tests/conformance mypy --module conformance_client --module conformance --module conformance_server --module connectrpc.conformance.v1.service_pb2_connect
 
 # Format code with ruff
 format:
@@ -33,10 +33,13 @@ protoc-gen *ARGS:
 
 generate:
     cd tests/conformance && buf generate
-    cd examples && buf generate    
+    cd examples && buf generate
 
-# Run conformance tests of async implementation
-conformance-test-async *ARGS: 
+# Run conformance tests
+conformance-test: conformance-test-client-async conformance-test-client-sync conformance-test-server-sync
+
+# Run conformance tests of async client implementation
+conformance-test-client-async *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v connectconformance &> /dev/null; then
@@ -55,8 +58,8 @@ conformance-test-async *ARGS:
         -- \
     	uv run python conformance_client.py async
 
-# Run conformance tests of async implementation
-conformance-test-sync *ARGS: 
+# Run conformance tests of sync client implementation
+conformance-test-client-sync *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v connectconformance &> /dev/null; then
@@ -74,6 +77,25 @@ conformance-test-sync *ARGS:
         {{ARGS}} \
         -- \
     	uv run python conformance_client.py sync
+
+# Run conformance tests of sync server implementation
+conformance-test-server-sync *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v connectconformance &> /dev/null; then
+        echo "Error: connectconformance binary not found in PATH"
+        echo "Please install it with: go install connectrpc.com/conformance/cmd/connectconformance@latest"
+        echo "Or download from: https://github.com/connectrpc/conformance/releases"
+        exit 1
+    fi
+    cd tests/conformance
+
+    connectconformance \
+        --conf ./sync_config.yaml \
+        --mode client \
+        {{ARGS}} \
+        -- \
+    	uv run python conformance_server.py sync
 
 # Run all checks (format, check, mypy, test, integration-test)
 all: format check mypy test integration-test

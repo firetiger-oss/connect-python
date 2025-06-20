@@ -1,5 +1,4 @@
 import asyncio
-import struct
 import sys
 import time
 import traceback
@@ -16,6 +15,8 @@ import urllib3.exceptions
 from google.protobuf.any_pb2 import Any as ProtoAny
 from multidict import MultiDict
 
+from conformance import read_size_delimited_message
+from conformance import write_size_delimited_message
 from connectrpc.client_connect import UnexpectedContentType
 from connectrpc.client_protocol import ConnectProtocol
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatRequest
@@ -417,35 +418,6 @@ def exception_to_proto(error: Exception) -> Error:
     }[error.code]
 
     return Error(code=code, message=error.message, details=details)
-
-
-def read_size_delimited_message() -> bytes | None:
-    """Read a size-delimited protobuf message from stdin."""
-    # Read 4-byte big-endian length prefix
-    length_bytes = sys.stdin.buffer.read(4)
-    if len(length_bytes) < 4:
-        return None  # EOF
-
-    # Unpack big-endian 32-bit integer
-    message_length = struct.unpack(">I", length_bytes)[0]
-
-    # Read the actual message
-    message_bytes = sys.stdin.buffer.read(message_length)
-    if len(message_bytes) < message_length:
-        raise ValueError("Incomplete message")
-
-    return message_bytes
-
-
-def write_size_delimited_message(message_bytes: bytes) -> None:
-    """Write a size-delimited protobuf message to stdout."""
-    # Write 4-byte big-endian length prefix
-    length = len(message_bytes)
-    sys.stdout.buffer.write(struct.pack(">I", length))
-
-    # Write the actual message
-    sys.stdout.buffer.write(message_bytes)
-    sys.stdout.buffer.flush()
 
 
 def main(mode: str) -> None:
