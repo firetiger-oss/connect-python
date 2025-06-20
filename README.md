@@ -75,7 +75,7 @@ which you can use like this:
 
 ```python
 def main():
-    eliza_client = AsyncElizaServiceClient("https://demo.connectrpc.com")
+    eliza_client = ElizaServiceClient("https://demo.connectrpc.com", urllib3.PoolManager())
 
 	# Unary responses:
     response = eliza_client.say(eliza_pb2.SayRequest(sentence="Hello, Eliza!"))
@@ -92,16 +92,16 @@ def main():
         eliza_pb2.PontificateRequest(sentence="But I will save them for later."),
     ]
     response = await eliza_client.pontificate(requests)
-	print("    Eliza responds: {response.sentence}")
+    print("    Eliza responds: {response.sentence}")
 
 	# Bidirectional RPCs: send an iterator, get an iterator.
-	requests = [
-		eliza_pb2.ConverseRequest(sentence="I have been having trouble communicating."),
-		eliza_pb2.ConverseRequest(sentence="But structured RPCs are pretty great!"),
-		eliza_pb2.ConverseRequest(sentence="What do you think?")
-	]
-	for response in eliza_client.converse(requests):
-		print("    Eliza: {response.sentence}")
+    requests = [
+   	    eliza_pb2.ConverseRequest(sentence="I have been having trouble communicating."),
+        eliza_pb2.ConverseRequest(sentence="But structured RPCs are pretty great!"),
+        eliza_pb2.ConverseRequest(sentence="What do you think?")
+    ]
+    for response in eliza_client.converse(requests):
+        print("    Eliza: {response.sentence}")
 ```
 
 ### Advanced usage
