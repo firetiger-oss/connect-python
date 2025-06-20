@@ -74,34 +74,33 @@ class ElizaServiceClient:
 which you can use like this:
 
 ```python
-def main():
-    eliza_client = ElizaServiceClient("https://demo.connectrpc.com", urllib3.PoolManager())
+eliza_client = ElizaServiceClient("https://demo.connectrpc.com", urllib3.PoolManager())
 
-	# Unary responses:
-    response = eliza_client.say(eliza_pb2.SayRequest(sentence="Hello, Eliza!"))
-    print(f"  Eliza says: {response.sentence}")
+# Unary responses:
+response = eliza_client.say(eliza_pb2.SayRequest(sentence="Hello, Eliza!"))
+print(f"  Eliza says: {response.sentence}")
 
-    # Streaming responses: use 'for' to iterate over messages in the stream
-    req = eliza_pb2.IntroduceRequest(name="Henry")
-    for response in eliza_client.introduce(req):
-        print(f"   Eliza: {response.sentence}")
+# Streaming responses: use 'for' to iterate over messages in the stream
+req = eliza_pb2.IntroduceRequest(name="Henry")
+for response in eliza_client.introduce(req):
+	print(f"   Eliza: {response.sentence}")
 
-    # Streaming requests: send an iterator, get a single message
-    requests = [
-        eliza_pb2.PontificateRequest(sentence="I have many things on my mind."),
-        eliza_pb2.PontificateRequest(sentence="But I will save them for later."),
-    ]
-    response = await eliza_client.pontificate(requests)
-    print("    Eliza responds: {response.sentence}")
+# Streaming requests: send an iterator, get a single message
+requests = [
+	eliza_pb2.PontificateRequest(sentence="I have many things on my mind."),
+	eliza_pb2.PontificateRequest(sentence="But I will save them for later."),
+]
+response = await eliza_client.pontificate(requests)
+print("    Eliza responds: {response.sentence}")
 
-	# Bidirectional RPCs: send an iterator, get an iterator.
-    requests = [
-   	    eliza_pb2.ConverseRequest(sentence="I have been having trouble communicating."),
-        eliza_pb2.ConverseRequest(sentence="But structured RPCs are pretty great!"),
-        eliza_pb2.ConverseRequest(sentence="What do you think?")
-    ]
-    for response in eliza_client.converse(requests):
-        print("    Eliza: {response.sentence}")
+# Bidirectional RPCs: send an iterator, get an iterator.
+requests = [
+	eliza_pb2.ConverseRequest(sentence="I have been having trouble communicating."),
+	eliza_pb2.ConverseRequest(sentence="But structured RPCs are pretty great!"),
+	eliza_pb2.ConverseRequest(sentence="What do you think?")
+]
+for response in eliza_client.converse(requests):
+	print("    Eliza: {response.sentence}")
 ```
 
 ### Advanced usage
