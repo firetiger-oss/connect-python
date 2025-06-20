@@ -15,10 +15,10 @@ from .client_base import AsyncBaseClient
 from .client_base import BaseClient
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .connect_serialization import ConnectSerialization
-from .debugprint import debug
 from .errors import ConnectError
 from .headers import HeaderInput
 from .headers import merge_headers
+from .headers import multidict_to_urllib3
 from .streams import StreamOutput
 from .streams import SynchronousStreamOutput
 from .streams_connect import EndStreamResponse
@@ -44,7 +44,54 @@ class ConnectProtocolClient(BaseClient):
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
     ) -> UnaryOutput[T]:
-        raise NotImplementedError
+        data = self.serde.serialize(req)
+        headers = CIMultiDict(
+            [
+                ("Content-Type", self.serde.unary_content_type),
+                ("Connect-Protocol-Version", "1"),
+            ]
+        )
+        headers = merge_headers(headers, extra_headers)
+
+        if timeout_seconds is not None and timeout_seconds > 0:
+            headers["Connect-Timeout-Ms"] = str(int(timeout_seconds * 1000))
+
+        headers_dict = multidict_to_urllib3(headers)
+        resp = self.http_client.request(
+            "POST",
+            url,
+            body=data,
+            headers=headers_dict,
+            timeout=timeout_seconds,
+            decode_content=False,
+            preload_content=False,
+            chunked=False,
+            retries=False,
+        )
+
+        output: ConnectUnaryOutput[T] = ConnectUnaryOutput(
+            response_headers=CIMultiDict(resp.headers)
+        )
+
+        if resp.status != 200:
+            body = resp.read()
+            output._error = ConnectError.from_http_response(resp.status, body)            
+            return output
+
+        if resp.headers["Content-Type"] != self.serde.unary_content_type:
+            raise UnexpectedContentType(resp.headers["Content-Type"])
+
+        try:
+            body = resp.read()
+            response_msg = self.serde.deserialize(body, response_type)
+        except Exception as e:
+            from .errors import ConnectErrorCode
+
+            output._error = ConnectError(ConnectErrorCode.INTERNAL, str(e))
+            raise ConnectPartialUnaryResponse(output) from e
+
+        output._message = response_msg
+        return output
 
     def call_streaming(
         self,
@@ -82,13 +129,13 @@ class AsyncConnectProtocolClient(AsyncBaseClient):
             ]
         )
         headers = merge_headers(headers, extra_headers)
-        debug("AsyncConnectProtocolClient.call_unary timeout_seconds=", timeout_seconds)
+
         if timeout_seconds is not None and timeout_seconds > 0:
             headers["Connect-Timeout-Ms"] = str(int(timeout_seconds * 1000))
             timeout = aiohttp.ClientTimeout(total=timeout_seconds)
         else:
             timeout = aiohttp.ClientTimeout(total=None)
-        debug("AsyncConnectProtocolClient.call_unary timeout=", timeout)
+
         async with self._http_client.request(
             "POST", url, data=data, headers=headers, timeout=timeout
         ) as resp:

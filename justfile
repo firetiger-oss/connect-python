@@ -71,7 +71,6 @@ conformance-test-sync *ARGS:
         --conf ./sync_config.yaml \
         --mode client \
         --known-failing="Client Cancellation/**" \
-        --run "Basic/**" \
         {{ARGS}} \
         -- \
     	uv run python conformance_client.py sync

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from multidict import CIMultiDict
 from multidict import MultiDict
+from urllib3 import HTTPHeaderDict
 
 # Type definitions for header inputs - what users can pass
 HeaderInput = (
@@ -15,6 +16,7 @@ HeaderInput = (
     | dict[str, list[str]]  # Multi-valued dict
     | CIMultiDict[str]  # Full multidict support
     | MultiDict[str]
+    | HTTPHeaderDict
 )
 
 # Internal type used throughout the client stack
@@ -50,8 +52,14 @@ def normalize_headers(input_headers: HeaderInput | None) -> HeadersInternal:
             else:
                 # Simple dict format
                 result.add(key, value)
-    else:
-        raise TypeError(f"Unsupported header type: {type(input_headers)}")
+        return result
+
+    if isinstance(input_headers, HTTPHeaderDict):
+        for k, v in input_headers.iteritems():
+            result.add(k, v)
+        return result
+
+    raise TypeError(f"Unsupported header type: {type(input_headers)}")
 
     return result
 
@@ -93,6 +101,13 @@ def headers_to_dict(headers: HeadersInternal) -> dict[str, str]:
         Simple dict with single values per key
     """
     return dict(headers)
+
+
+def multidict_to_urllib3(headers: HeadersInternal) -> HTTPHeaderDict:
+    result = HTTPHeaderDict()
+    for k, v in headers.items():
+        result.add(k, v)
+    return result
 
 
 def get_all_header_values(headers: HeadersInternal, key: str) -> list[str]:

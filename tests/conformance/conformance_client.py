@@ -12,6 +12,7 @@ import aiohttp
 # Imported for their side effects of loading protobuf registry
 import google.protobuf.descriptor_pb2  # noqa: F401
 import urllib3
+import urllib3.exceptions
 from google.protobuf.any_pb2 import Any as ProtoAny
 from multidict import MultiDict
 
@@ -372,6 +373,8 @@ def multidict_to_proto(headers: MultiDict[str]) -> list[Header]:
 
 def exception_to_proto(error: Exception) -> Error:
     if isinstance(error, TimeoutError):
+        error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
+    if isinstance(error, urllib3.exceptions.TimeoutError):
         error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
 
     if isinstance(error, UnexpectedContentType):
