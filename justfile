@@ -35,8 +35,8 @@ generate:
     cd tests/conformance && buf generate
     cd examples && buf generate    
 
-# Run conformance tests (requires connectconformance binary). Usage: just conformance-test [ARGS...]
-conformance-test *ARGS: 
+# Run conformance tests of async implementation
+conformance-test-async *ARGS: 
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v connectconformance &> /dev/null; then
@@ -48,12 +48,33 @@ conformance-test *ARGS:
     cd tests/conformance
 
     connectconformance \
-        --conf ./config.yaml \
+        --conf ./async_config.yaml \
         --mode client \
         --known-failing="Client Cancellation/**" \
         {{ARGS}} \
         -- \
-    	uv run python conformance_client.py
+    	uv run python conformance_client.py async
+
+# Run conformance tests of async implementation
+conformance-test-sync *ARGS: 
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v connectconformance &> /dev/null; then
+        echo "Error: connectconformance binary not found in PATH"
+        echo "Please install it with: go install connectrpc.com/conformance/cmd/connectconformance@latest"
+        echo "Or download from: https://github.com/connectrpc/conformance/releases"
+        exit 1
+    fi
+    cd tests/conformance
+
+    connectconformance \
+        --conf ./sync_config.yaml \
+        --mode client \
+        --known-failing="Client Cancellation/**" \
+        --run "Basic/**" \
+        {{ARGS}} \
+        -- \
+    	uv run python conformance_client.py sync
 
 # Run all checks (format, check, mypy, test, integration-test)
 all: format check mypy test integration-test

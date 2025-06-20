@@ -33,7 +33,8 @@ class ConnectProtocolClient(BaseClient):
         http_client: urllib3.PoolManager,
         serialization: ConnectSerialization = CONNECT_PROTOBUF_SERIALIZATION,
     ):
-        raise NotImplementedError
+        self.http_client = http_client
+        self.serde = serialization
 
     def call_unary(
         self,
