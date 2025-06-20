@@ -19,7 +19,7 @@ class EndStreamResponse:
     metadata: CIMultiDict[str]
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> EndStreamResponse:
+    def from_bytes(cls, data: bytes | bytearray) -> EndStreamResponse:
         data_dict = json.loads(data)
 
         val = EndStreamResponse(error=None, metadata=CIMultiDict())

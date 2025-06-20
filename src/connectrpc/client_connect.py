@@ -3,6 +3,7 @@ from __future__ import annotations
 import struct
 from collections.abc import AsyncIterator
 from collections.abc import Iterable
+from collections.abc import Iterator
 from typing import Any
 from typing import TypeVar
 
@@ -89,6 +90,8 @@ class ConnectProtocolClient(BaseClient):
 
             output._error = ConnectError(ConnectErrorCode.INTERNAL, str(e))
             raise ConnectPartialUnaryResponse(output) from e
+        finally:
+            resp.release_conn()
 
         output._message = response_msg
         return output
@@ -101,7 +104,44 @@ class ConnectProtocolClient(BaseClient):
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
     ) -> StreamOutput[T]:
-        raise NotImplementedError
+        headers = CIMultiDict(
+            [
+                ("Content-Type", self.serde.streaming_content_type),
+                ("Connect-Protocol-Version", "1"),
+            ]
+        )
+        headers = merge_headers(headers, extra_headers)
+
+        def encoded_stream() -> Iterable[bytes]:
+            for msg in reqs:
+                encoded = self.serde.serialize(msg)
+                envelope = struct.pack(">BI", 0, len(encoded))
+                yield envelope + encoded
+
+        if timeout_seconds is not None and timeout_seconds > 0:
+            headers["Connect-Timeout-Ms"] = str(int(timeout_seconds * 1000))
+
+        headers_dict = multidict_to_urllib3(headers)
+        resp = self.http_client.request(
+            "POST",
+            url,
+            body=encoded_stream(),
+            headers=headers_dict,
+            timeout=timeout_seconds,
+            decode_content=False,
+            preload_content=False,
+            chunked=False,
+            retries=False,
+            release_conn=False,
+        )
+        if resp.headers["Content-Type"] != self.serde.streaming_content_type:
+            raise UnexpectedContentType(resp.headers["Content-Type"])
+
+        stream_output = ConnectStreamOutput(resp, response_type, self.serde)
+        if resp.status != 200:
+            body = resp.read()
+            stream_output._abort_with_error(ConnectError.from_http_response(resp.status, body))
+        return stream_output
 
 
 class AsyncConnectProtocolClient(AsyncBaseClient):
@@ -248,6 +288,122 @@ class ConnectUnaryOutput(UnaryOutput[T]):
         return trailers
 
 
+class ConnectStreamOutput(StreamOutput[T]):
+    """Represents an iterator over the messages in a Connect
+    protobuf-encoded streaming response.
+    """
+
+    # Size of a read during streaming
+    READ_CHUNK_SIZE = 65535
+
+    def __init__(
+        self,
+        response: urllib3.BaseHTTPResponse,
+        response_type: type[T],
+        serde: ConnectSerialization,
+    ):
+        self._response = response
+        self._response_type = response_type
+        self._serde = serde
+
+        self._buffer: bytearray = bytearray()
+
+        self._response_headers = CIMultiDict(response.headers)
+        self._response_trailers: CIMultiDict[str] = CIMultiDict()
+        self._error: ConnectError | None = None
+
+        self._consumed = False
+        self._released = False
+
+    def _abort_with_error(self, err: Exception) -> None:
+        from .errors import ConnectErrorCode
+
+        self._error = ConnectError(ConnectErrorCode.INTERNAL, str(err))
+        self.close()
+
+    def _readexactly(self, n: int) -> bytearray:
+        while len(self._buffer) < n:
+            if not self._fill_buffer():
+                raise EOFError
+
+        chunk = self._buffer[:n]
+        del self._buffer[:n]
+        return chunk
+
+    def _fill_buffer(self) -> bool:
+        """
+        Try to read from the response. Return False if the response has hit EOF
+        """
+        read_chunk = self._response.read(self.READ_CHUNK_SIZE)
+        if not len(read_chunk):
+            return False
+        self._buffer.extend(read_chunk)
+        return True
+
+    def _readall(self) -> bytearray:
+        self._buffer.extend(self._response.read())
+        return self._buffer
+
+    def __next__(self) -> T:
+        if self._consumed or self._released:
+            raise StopIteration
+        envelope = self._readexactly(5)
+        if envelope[0] & 1:
+            # message is compressed, which we dont currently handle
+            raise NotImplementedError("cant handle compressed messages yet")
+        if envelope[0] & 2:
+            # This is an EndStreamResponse
+            encoded = self._readall()
+            end_stream_response = EndStreamResponse.from_bytes(encoded)
+
+            if end_stream_response.error is not None:
+                self._error = end_stream_response.error
+
+            self._response_trailers = end_stream_response.metadata
+            self._consumed = True
+            # Stream is now complete - release connection before StopIteration
+            self.close()
+            raise StopIteration
+
+        length = struct.unpack(">I", envelope[1:5])[0]
+        encoded = self._readexactly(length)
+        return self._serde.deserialize(bytes(encoded), self._response_type)
+
+    def __iter__(self) -> Iterator[T]:
+        return self
+
+    def __enter__(self) -> ConnectStreamOutput[T]:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        self.close()
+
+    def response_headers(self) -> CIMultiDict[str]:
+        """Get HTTP response headers from the initial response."""
+        return self._response_headers
+
+    def response_trailers(self) -> CIMultiDict[str]:
+        if not self._consumed:
+            raise RuntimeError("Stream must be fully consumed before accessing trailing metadata")
+        return self._response_trailers
+
+    def close(self) -> None:
+        if not self._released:
+            self._response.release_conn()
+            self._released = True
+
+    def done(self) -> bool:
+        return self._consumed
+
+    def error(self) -> ConnectError | None:
+        return self._error
+
+
 class ConnectAsyncStreamOutput(AsyncStreamOutput[T]):
     """Represents an asynchronous iterator over the messages in a
     Connect protobuf-encoded streaming response.
@@ -258,14 +414,16 @@ class ConnectAsyncStreamOutput(AsyncStreamOutput[T]):
         self, response: aiohttp.ClientResponse, response_type: type[T], serde: ConnectSerialization
     ):
         self._response = response
-        self._response_body = response.content
         self._response_type = response_type
         self._serde = serde
+
         self._response_headers = CIMultiDict(response.headers)  # Capture HTTP response headers
+        self._response_body = response.content
         self._response_trailers: CIMultiDict[str] = CIMultiDict()
+        self._error: ConnectError | None = None
+
         self._consumed = False
         self._released = False
-        self._error: ConnectError | None = None
 
     async def _abort_with_error(self, err: Exception) -> None:
         from .errors import ConnectErrorCode
