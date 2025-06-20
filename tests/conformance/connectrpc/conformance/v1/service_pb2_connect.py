@@ -13,7 +13,7 @@ from connectrpc.client_connect import ConnectProtocolError
 from connectrpc.headers import HeaderInput
 from connectrpc.streams import StreamInput
 from connectrpc.streams import AsyncStreamOutput
-from connectrpc.streams import SynchronousStreamOutput
+from connectrpc.streams import StreamOutput
 from connectrpc.unary import UnaryOutput
 from connectrpc.unary import ClientStreamingOutput
 
@@ -64,7 +64,7 @@ class ConformanceServiceClient:
 
     def call_server_stream(
         self, req: connectrpc.conformance.v1.service_pb2.ServerStreamRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
-    ) -> SynchronousStreamOutput[connectrpc.conformance.v1.service_pb2.ServerStreamResponse]:
+    ) -> StreamOutput[connectrpc.conformance.v1.service_pb2.ServerStreamResponse]:
         """Low-level method to call ServerStream, granting access to errors and metadata"""
         url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/ServerStream"
         return self._connect_client.call_server_streaming(
@@ -108,7 +108,7 @@ class ConformanceServiceClient:
 
     def call_bidi_stream(
         self, reqs: Iterable[connectrpc.conformance.v1.service_pb2.BidiStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
-    ) -> SynchronousStreamOutput[connectrpc.conformance.v1.service_pb2.BidiStreamResponse]:
+    ) -> StreamOutput[connectrpc.conformance.v1.service_pb2.BidiStreamResponse]:
         """Low-level method to call BidiStream, granting access to errors and metadata"""
         url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/BidiStream"
         return self._connect_client.call_bidirectional_streaming(
@@ -202,7 +202,7 @@ class AsyncConformanceServiceClient:
 
     async def call_server_stream(
         self, req: connectrpc.conformance.v1.service_pb2.ServerStreamRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
-    ) -> StreamOutput[connectrpc.conformance.v1.service_pb2.ServerStreamResponse]:
+    ) -> AsyncStreamOutput[connectrpc.conformance.v1.service_pb2.ServerStreamResponse]:
         """Low-level method to call ServerStream, granting access to errors and metadata"""
         url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/ServerStream"
         return await self._connect_client.call_server_streaming(

@@ -20,7 +20,8 @@ StreamInput = AsyncIterator[T] | Iterable[T]
 
 
 class AsyncStreamOutput(Protocol[U]):
-    """Protocol for streaming response objects that manage connection resources.
+    """Protocol for asynchronous streaming response objects that
+    manage connection resources.
 
     AsyncStreamOutput represents an async iterable that yields messages from a streaming
     RPC response. It provides two usage patterns for proper resource management:
@@ -50,6 +51,7 @@ class AsyncStreamOutput(Protocol[U]):
        finally:
            await stream.close()  # Explicit cleanup required
        ```
+
     """
 
     def __aiter__(self) -> AsyncIterator[U]:
@@ -112,7 +114,7 @@ class AsyncStreamOutput(Protocol[U]):
         ...
 
 
-class SynchronousStreamOutput(Protocol[U]):
+class StreamOutput(Protocol[U]):
     def response_headers(self) -> CIMultiDict[str]: ...
 
     def response_trailers(self) -> CIMultiDict[str]: ...

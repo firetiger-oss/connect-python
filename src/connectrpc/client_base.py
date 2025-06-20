@@ -7,7 +7,7 @@ from google.protobuf.message import Message
 
 from .headers import HeaderInput
 from .streams import AsyncStreamOutput
-from .streams import SynchronousStreamOutput
+from .streams import StreamOutput
 from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
@@ -30,7 +30,7 @@ class BaseClient(Protocol):
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> SynchronousStreamOutput[T]: ...
+    ) -> StreamOutput[T]: ...
 
 
 class AsyncBaseClient(Protocol):

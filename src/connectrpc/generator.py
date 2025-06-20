@@ -80,7 +80,7 @@ def _generate_server_streaming_rpc(
 
     g.P("def call_", m.py_name, "(")
     g.P("    self, req: ", m.input.py_ident, ",", common_params_str)
-    g.P(") -> SynchronousStreamOutput[", m.output.py_ident, "]:")
+    g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
     docstring(
         g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata"
@@ -154,7 +154,7 @@ def _generate_bidirectional_streaming_rpc(
         "], ",
         common_params_str,
     )
-    g.P(") -> SynchronousStreamOutput[", m.output.py_ident, "]:")
+    g.P(") -> StreamOutput[", m.output.py_ident, "]:")
     g.set_indent(8)
     docstring(
         g, "Low-level method to call ", m.proto.name, ", granting access to errors and metadata"
@@ -344,7 +344,7 @@ def generate(gen: protogen.Plugin) -> None:
         g.P("from connectrpc.headers import HeaderInput")
         g.P("from connectrpc.streams import StreamInput")
         g.P("from connectrpc.streams import AsyncStreamOutput")
-        g.P("from connectrpc.streams import SynchronousStreamOutput")
+        g.P("from connectrpc.streams import StreamOutput")
         g.P("from connectrpc.unary import UnaryOutput")
         g.P("from connectrpc.unary import ClientStreamingOutput")
         g.P()

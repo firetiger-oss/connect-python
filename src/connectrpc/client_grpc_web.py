@@ -10,7 +10,7 @@ from .client_base import AsyncBaseClient
 from .client_base import BaseClient
 from .headers import HeaderInput
 from .streams import AsyncStreamOutput
-from .streams import SynchronousStreamOutput
+from .streams import StreamOutput
 from .unary import UnaryOutput
 
 T = TypeVar("T", bound=Message)
@@ -37,7 +37,7 @@ class ConnectGRPCWebClient(BaseClient):
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> SynchronousStreamOutput[T]:
+    ) -> StreamOutput[T]:
         raise NotImplementedError
 
 

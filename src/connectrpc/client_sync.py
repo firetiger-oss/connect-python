@@ -14,7 +14,7 @@ from .client_protocol import ConnectProtocol
 from .connect_serialization import CONNECT_JSON_SERIALIZATION
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .headers import HeaderInput
-from .streams import SynchronousStreamOutput
+from .streams import StreamOutput
 from .unary import ClientStreamingOutput
 from .unary import UnaryOutput
 
@@ -80,7 +80,7 @@ class ConnectClient:
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> SynchronousStreamOutput[T]:
+    ) -> StreamOutput[T]:
         return self._client.call_streaming(
             url,
             [req],
@@ -96,7 +96,7 @@ class ConnectClient:
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> SynchronousStreamOutput[T]:
+    ) -> StreamOutput[T]:
         return self._client.call_streaming(
             url,
             reqs,

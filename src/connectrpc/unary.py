@@ -9,7 +9,7 @@ from multidict import CIMultiDict
 from .errors import ConnectError
 from .errors import ConnectErrorCode
 from .streams import AsyncStreamOutput
-from .streams import SynchronousStreamOutput
+from .streams import StreamOutput
 
 T = TypeVar("T", bound=Message, covariant=True)
 
@@ -44,9 +44,7 @@ class ClientStreamingOutput(UnaryOutput[T]):
         self._error = error
 
     @classmethod
-    def from_stream_output(
-        cls, stream_output: SynchronousStreamOutput[T]
-    ) -> ClientStreamingOutput[T]:
+    def from_stream_output(cls, stream_output: StreamOutput[T]) -> ClientStreamingOutput[T]:
         response: T | None = None
         error: ConnectError | None = None
         for msg in stream_output:

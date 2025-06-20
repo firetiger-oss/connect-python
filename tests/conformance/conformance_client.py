@@ -37,7 +37,7 @@ from connectrpc.debugprint import debug
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
 from connectrpc.streams import AsyncStreamOutput
-from connectrpc.streams import SynchronousStreamOutput
+from connectrpc.streams import StreamOutput
 from connectrpc.unary import UnaryOutput
 
 
@@ -296,7 +296,7 @@ async def handle_async(request: ClientCompatRequest) -> ClientCompatResponse:
         return response
 
 
-def result_from_stream_output(stream_output: SynchronousStreamOutput[Any]) -> ClientResponseResult:
+def result_from_stream_output(stream_output: StreamOutput[Any]) -> ClientResponseResult:
     result = ClientResponseResult()
     for server_msg in stream_output:
         result.payloads.append(server_msg.payload)
