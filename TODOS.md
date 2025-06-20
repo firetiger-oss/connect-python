@@ -33,7 +33,7 @@ This document outlines the specific issues that need to be fixed to pass the Con
 
 ### 2. Missing Response Headers and Trailers
 **Files to modify**: 
-- `src/connectrpc/client_connect.py` (ConnectStreamOutput class)
+- `src/connectrpc/client_connect.py` (ConnectAsyncStreamOutput class)
 - `tests/conformance/conformance_client.py` (response handling)
 
 **Issue**: Response headers (`x-custom-header`) and trailers (`x-custom-trailer`) are not being captured from server responses.
@@ -44,7 +44,7 @@ This document outlines the specific issues that need to be fixed to pass the Con
 
 **Fix needed**: 
 1. Extract response headers from `aiohttp.ClientResponse` in unary calls
-2. Properly expose trailing metadata from `ConnectStreamOutput.trailing_metadata()`
+2. Properly expose trailing metadata from `ConnectAsyncStreamOutput.trailing_metadata()`
 3. Update conformance client to populate response headers/trailers in `ClientCompatResponse`
 
 ### 3. Streaming Response Handling - Empty Responses

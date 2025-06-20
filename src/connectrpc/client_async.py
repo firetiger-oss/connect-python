@@ -15,8 +15,8 @@ from .connect_serialization import CONNECT_JSON_SERIALIZATION
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .debugprint import debug
 from .headers import HeaderInput
+from .streams import AsyncStreamOutput
 from .streams import StreamInput
-from .streams import StreamOutput
 from .unary import ClientStreamingOutput
 from .unary import UnaryOutput
 
@@ -92,7 +92,7 @@ class AsyncConnectClient:
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> StreamOutput[T]:
+    ) -> AsyncStreamOutput[T]:
         async def single_req() -> AsyncIterator[Message]:
             yield req
 
@@ -111,7 +111,7 @@ class AsyncConnectClient:
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> StreamOutput[T]:
+    ) -> AsyncStreamOutput[T]:
         async_iter = self._to_async_iterator(reqs)
         return await self._client.call_streaming(
             url,

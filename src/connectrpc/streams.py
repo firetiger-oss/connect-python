@@ -19,10 +19,10 @@ U = TypeVar("U", bound=Message, covariant=True)
 StreamInput = AsyncIterator[T] | Iterable[T]
 
 
-class StreamOutput(Protocol[U]):
+class AsyncStreamOutput(Protocol[U]):
     """Protocol for streaming response objects that manage connection resources.
 
-    StreamOutput represents an async iterable that yields messages from a streaming
+    AsyncStreamOutput represents an async iterable that yields messages from a streaming
     RPC response. It provides two usage patterns for proper resource management:
 
     1. **Async Context Manager (Recommended)**:

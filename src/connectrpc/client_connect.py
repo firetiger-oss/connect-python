@@ -19,7 +19,7 @@ from .errors import ConnectError
 from .headers import HeaderInput
 from .headers import merge_headers
 from .headers import multidict_to_urllib3
-from .streams import StreamOutput
+from .streams import AsyncStreamOutput
 from .streams import SynchronousStreamOutput
 from .streams_connect import EndStreamResponse
 from .unary import UnaryOutput
@@ -75,7 +75,7 @@ class ConnectProtocolClient(BaseClient):
 
         if resp.status != 200:
             body = resp.read()
-            output._error = ConnectError.from_http_response(resp.status, body)            
+            output._error = ConnectError.from_http_response(resp.status, body)
             return output
 
         if resp.headers["Content-Type"] != self.serde.unary_content_type:
@@ -168,7 +168,7 @@ class AsyncConnectProtocolClient(AsyncBaseClient):
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> StreamOutput[T]:
+    ) -> AsyncStreamOutput[T]:
         headers = CIMultiDict(
             [
                 ("Content-Type", self.serde.streaming_content_type),
@@ -198,7 +198,7 @@ class AsyncConnectProtocolClient(AsyncBaseClient):
             await http_response.release()
             raise UnexpectedContentType(http_response.headers["Content-Type"])
 
-        stream_output = ConnectStreamOutput(http_response, response_type, self.serde)
+        stream_output = ConnectAsyncStreamOutput(http_response, response_type, self.serde)
         if http_response.status != 200:
             txt = await http_response.text()
             await stream_output._abort_with_error(
@@ -248,9 +248,9 @@ class ConnectUnaryOutput(UnaryOutput[T]):
         return trailers
 
 
-class ConnectStreamOutput(StreamOutput[T]):
-    """Represents an iterator over the messages in a Connect protobuf-encoded
-    streaming response.
+class ConnectAsyncStreamOutput(AsyncStreamOutput[T]):
+    """Represents an asynchronous iterator over the messages in a
+    Connect protobuf-encoded streaming response.
 
     """
 
@@ -311,7 +311,7 @@ class ConnectStreamOutput(StreamOutput[T]):
             raise RuntimeError("Stream must be fully consumed before accessing trailing metadata")
         return self._response_trailers
 
-    async def __aenter__(self) -> ConnectStreamOutput[T]:
+    async def __aenter__(self) -> ConnectAsyncStreamOutput[T]:
         """Enter async context manager for automatic resource management."""
         return self
 

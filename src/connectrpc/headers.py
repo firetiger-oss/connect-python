@@ -61,8 +61,6 @@ def normalize_headers(input_headers: HeaderInput | None) -> HeadersInternal:
 
     raise TypeError(f"Unsupported header type: {type(input_headers)}")
 
-    return result
-
 
 def merge_headers(base: HeadersInternal, extra: HeaderInput | None) -> HeadersInternal:
     """Merge extra headers into base headers, preserving multi-values.

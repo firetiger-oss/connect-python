@@ -9,14 +9,14 @@
 - **Duck typing for streams**: `StreamInput = Union[AsyncIterator[T], Iterable[T]]` allows lists, generators, async iterators
 
 ### Type System Evolution: From def to async def for Protocol Methods
-**Original Design (Deprecated)**: `def call_streaming() -> StreamOutput[T]` for direct `async for` usage without await.
+**Original Design (Deprecated)**: `def call_streaming() -> AsyncStreamOutput[T]` for direct `async for` usage without await.
 
 **Problem Discovered**: HTTP streaming requires async connection setup, but protocol expected synchronous stream object return.
 
 **Solution (Dec 2024)**: Make protocol methods async to properly handle connection lifecycle:
 ```python
 # CURRENT: async def enables proper connection setup
-async def call_streaming(...) -> StreamOutput[T]: ...
+async def call_streaming(...) -> AsyncStreamOutput[T]: ...
 
 # Usage pattern now requires await:
 stream = await client.call_server_streaming(url, request, ResponseType)
@@ -80,12 +80,12 @@ async with await client.converse_stream(requests) as stream:
 - Protocol authors focus on core streaming mechanics
 - Proper async connection lifecycle management
 
-### StreamOutput API (Dec 2024)
+### AsyncStreamOutput API (Dec 2024)
 **Key Innovation**: Rich streaming return type with trailing metadata access.
 
 **Problem**: Original `AsyncIterator[T]` return type couldn't expose trailing metadata from Connect protocol `EndStreamResponse`.
 
-**Solution**: `StreamOutput[T]` protocol with resource management and metadata access:
+**Solution**: `AsyncStreamOutput[T]` protocol with resource management and metadata access:
 ```python
 # Context manager usage (recommended)
 async with await client.call_server_streaming(url, request, ResponseType) as stream:
@@ -106,8 +106,8 @@ metadata = stream.trailing_metadata()  # Returns Optional[dict], raises if not c
 ```
 
 **Architecture**:
-- `StreamOutput[T]`: Protocol with `__aiter__()`, `trailing_metadata()`, `done()`, and async context manager support
-- `BaseClient.call_streaming()`: Returns `StreamOutput[T]` with proper connection lifecycle
+- `AsyncStreamOutput[T]`: Protocol with `__aiter__()`, `trailing_metadata()`, `done()`, and async context manager support
+- `BaseClient.call_streaming()`: Returns `AsyncStreamOutput[T]` with proper connection lifecycle
 - `ConnectProtobufClient`: Captures metadata from `EndStreamResponse` and manages HTTP connection pooling
 - Connection lifecycle: Automatically releases on completion, early termination, or exceptions
 
@@ -123,7 +123,7 @@ metadata = stream.trailing_metadata()  # Returns Optional[dict], raises if not c
 - Type system: ✅ Fixed (async protocol methods)
 - Protocol interface: ✅ Simplified (2 async methods)
 - ConnectProtobuf client: ✅ Complete with connection pooling
-- StreamOutput API: ✅ Complete with resource management (Dec 2024)
+- AsyncStreamOutput API: ✅ Complete with resource management (Dec 2024)
 - Connection lifecycle: ✅ Fixed (release vs close, context managers, exception safety)
 - Dual API design: ✅ Complete (simple + stream methods) (Dec 2024)
 - Service wrapper pattern: ✅ Demonstrated with AsyncElizaServiceClient
@@ -135,7 +135,7 @@ metadata = stream.trailing_metadata()  # Returns Optional[dict], raises if not c
 **Problem**: HTTP connections were being closed prematurely with `async with` context manager, causing "Connection closed" errors during stream consumption.
 
 **Solution**: 
-- Pass full `ClientResponse` to `StreamOutput` implementation
+- Pass full `ClientResponse` to `AsyncStreamOutput` implementation
 - Use `await resp.release()` instead of `await resp.close()` for connection pooling
 - Implement async context manager protocol for automatic cleanup
 - Add explicit `done()` method for manual resource management
@@ -150,14 +150,14 @@ metadata = stream.trailing_metadata()  # Returns Optional[dict], raises if not c
 
 **Solution**: Dual API approach in service wrappers:
 - **Simple methods**: `introduce()`, `converse()` return `AsyncIterator[T]` with automatic cleanup
-- **Stream methods**: `introduce_stream()`, `converse_stream()` return `StreamOutput[T]` for metadata access
+- **Stream methods**: `introduce_stream()`, `converse_stream()` return `AsyncStreamOutput[T]` for metadata access
 - **Implementation**: Simple methods call stream methods internally and handle resource management
 
 **Benefits**:
 - ✅ Clean default API: `async for response in client.introduce(req):`
 - ✅ No resource leaks: Automatic cleanup in simple methods  
 - ✅ Advanced features available: Trailing metadata access via `_stream` methods
-- ✅ Backward compatibility: Advanced users can still access full StreamOutput
+- ✅ Backward compatibility: Advanced users can still access full AsyncStreamOutput
 - ✅ Service-level implementation: No changes needed to core AsyncConnectClient library
 
 **Architecture Decision**: This dual approach can be implemented entirely in service wrapper layers, allowing different services to choose their preferred API style without changing the underlying AsyncConnectClient protocol interface.

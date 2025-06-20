@@ -12,7 +12,7 @@ from connectrpc.client_protocol import ConnectProtocol
 from connectrpc.client_connect import ConnectProtocolError
 from connectrpc.headers import HeaderInput
 from connectrpc.streams import StreamInput
-from connectrpc.streams import StreamOutput
+from connectrpc.streams import AsyncStreamOutput
 from connectrpc.streams import SynchronousStreamOutput
 from connectrpc.unary import UnaryOutput
 from connectrpc.unary import ClientStreamingOutput
@@ -248,7 +248,7 @@ class AsyncConformanceServiceClient:
 
     async def call_bidi_stream(
         self, reqs: StreamInput[connectrpc.conformance.v1.service_pb2.BidiStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
-    ) -> StreamOutput[connectrpc.conformance.v1.service_pb2.BidiStreamResponse]:
+    ) -> AsyncStreamOutput[connectrpc.conformance.v1.service_pb2.BidiStreamResponse]:
         """Low-level method to call BidiStream, granting access to errors and metadata"""
         url = self.base_url + "/connectrpc.conformance.v1.ConformanceService/BidiStream"
         return await self._connect_client.call_bidirectional_streaming(

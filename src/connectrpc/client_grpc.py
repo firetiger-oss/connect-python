@@ -9,7 +9,7 @@ from google.protobuf.message import Message
 from .client_base import AsyncBaseClient
 from .client_base import BaseClient
 from .headers import HeaderInput
-from .streams import StreamOutput
+from .streams import AsyncStreamOutput
 from .streams import SynchronousStreamOutput
 from .unary import UnaryOutput
 
@@ -62,5 +62,5 @@ class AsyncConnectGRPCClient(AsyncBaseClient):
         response_type: type[T],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> StreamOutput[T]:
+    ) -> AsyncStreamOutput[T]:
         raise NotImplementedError

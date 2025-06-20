@@ -36,7 +36,7 @@ from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClie
 from connectrpc.debugprint import debug
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
-from connectrpc.streams import StreamOutput
+from connectrpc.streams import AsyncStreamOutput
 from connectrpc.streams import SynchronousStreamOutput
 from connectrpc.unary import UnaryOutput
 
@@ -314,7 +314,9 @@ def result_from_stream_output(stream_output: SynchronousStreamOutput[Any]) -> Cl
     return result
 
 
-async def result_from_async_stream_output(stream_output: StreamOutput[Any]) -> ClientResponseResult:
+async def result_from_async_stream_output(
+    stream_output: AsyncStreamOutput[Any],
+) -> ClientResponseResult:
     result = ClientResponseResult()
     async with stream_output as stream:
         async for server_msg in stream:

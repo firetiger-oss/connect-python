@@ -13,8 +13,8 @@ from connectrpc.client_connect import ConnectProtocolError
 from connectrpc.client_protocol import ConnectProtocol
 from connectrpc.client_sync import ConnectClient
 from connectrpc.headers import HeaderInput
+from connectrpc.streams import AsyncStreamOutput
 from connectrpc.streams import StreamInput
-from connectrpc.streams import StreamOutput
 from connectrpc.streams import SynchronousStreamOutput
 from connectrpc.unary import UnaryOutput
 
@@ -185,7 +185,7 @@ class AsyncElizaServiceClient:
         reqs: StreamInput[eliza_pb2.ConverseRequest],
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> StreamOutput[eliza_pb2.ConverseResponse]:
+    ) -> AsyncStreamOutput[eliza_pb2.ConverseResponse]:
         """Low-level method to call Converse, granting access to errors and metadata"""
         url = self.base_url + "/connectrpc.eliza.v1.ElizaService/Converse"
         return await self._connect_client.call_bidirectional_streaming(
@@ -219,7 +219,7 @@ class AsyncElizaServiceClient:
         req: eliza_pb2.IntroduceRequest,
         extra_headers: HeaderInput | None = None,
         timeout_seconds: float | None = None,
-    ) -> StreamOutput[eliza_pb2.IntroduceResponse]:
+    ) -> AsyncStreamOutput[eliza_pb2.IntroduceResponse]:
         """Low-level method to call Introduce, granting access to errors and metadata"""
         url = self.base_url + "/connectrpc.eliza.v1.ElizaService/Introduce"
         return await self._connect_client.call_server_streaming(

@@ -152,7 +152,7 @@ metadata
  - for unary requests and client-streaming requests, the response `T`
    is wrapped in a `connectrpc.unary.UnaryOutput[T]`.
  - for server-streaming and bidirectional requests, you get
-   `connectrpc.streams.StreamOutput[T]`.
+   `connectrpc.streams.AsyncStreamOutput[T]`.
 
 ##### Accessing messages
 
@@ -164,8 +164,8 @@ response = output.message()
 print(response.sentence)
 ```
 
-`StreamOutput`s require a little more work. In order to avoid leaking
-HTTP connection resources, StreamOutputs need to be cleaned up after
+`AsyncStreamOutput`s require a little more work. In order to avoid leaking
+HTTP connection resources, AsyncStreamOutputs need to be cleaned up after
 use with `output.close()`. You can handle that by using them as a
 context manager:
 
@@ -193,7 +193,7 @@ if output.error() is not None:
 
 ##### Response metadata
 
-`UnaryOutput` and `StreamOutput` provide access to metadata in the same way:
+`UnaryOutput` and `AsyncStreamOutput` provide access to metadata in the same way:
 
 ```python
 headers = output.response_headers() 
@@ -206,19 +206,19 @@ objects - that is, case-insensitive multiple-valued
 dictionaries. Basically, you can think of them as `dict[str,
 list[str]]` with case-insensitive keys and a few conveniences.
 
-Note that the `response_trailers` of a `StreamOutput` are only
+Note that the `response_trailers` of a `AsyncStreamOutput` are only
 accessible after the stream has been fully consumed. Iterate over all
 responses in the stream before trying to access the trailers, or else
 you'll get an exception.
 
 ##### Errors
 
-`UnaryOutput` and `StreamOutput` both give you errors through the
+`UnaryOutput` and `AsyncStreamOutput` both give you errors through the
 `error()` accessor function, which returns a
 `connectrpc.errors.ConnectError` exception, which includes a code,
 message, and optionally extra details.
 
-Note that the error in a `StreamOutput` might not be available until
+Note that the error in a `AsyncStreamOutput` might not be available until
 you've consumed all messages in the stream. For `UnaryOutput`, it is
 available right away.
 
