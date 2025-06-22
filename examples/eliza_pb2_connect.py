@@ -94,6 +94,7 @@ class ElizaServiceClient:
             url, req, eliza_pb2.IntroduceResponse, extra_headers, timeout_seconds
         )
 
+
 class AsyncElizaServiceClient:
     def __init__(
         self,
