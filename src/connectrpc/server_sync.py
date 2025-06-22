@@ -122,21 +122,28 @@ class ConnectWSGI:
             )
             return self.send_connect_error(start_response, [], err)
 
-        if rpc_type == RPCType.UNARY:
-            return self.call_unary(environ, start_response, rpc=self.unary_rpcs[path])
-        elif rpc_type == RPCType.CLIENT_STREAMING:
-            return self.call_client_streaming(
-                environ, start_response, self.client_streaming_rpcs[path]
-            )
-        elif rpc_type == RPCType.SERVER_STREAMING:
-            return self.call_server_streaming(
-                environ, start_response, self.server_streaming_rpcs[path]
-            )
-        elif rpc_type == RPCType.BIDI_STREAMING:
-            return self.call_bidi_streaming(environ, start_response, self.bidi_streaming_rpcs[path])
-        else:
-            raise AssertionError("unreachable")
+        try:
+            if rpc_type == RPCType.UNARY:
+                return self.call_unary(environ, start_response, rpc=self.unary_rpcs[path])
+            elif rpc_type == RPCType.CLIENT_STREAMING:
+                return self.call_client_streaming(
+                    environ, start_response, self.client_streaming_rpcs[path]
+                )
+            elif rpc_type == RPCType.SERVER_STREAMING:
+                return self.call_server_streaming(
+                    environ, start_response, self.server_streaming_rpcs[path]
+                )
+            elif rpc_type == RPCType.BIDI_STREAMING:
+                return self.call_bidi_streaming(environ, start_response, self.bidi_streaming_rpcs[path])
+            else:
+                raise AssertionError("unreachable")
 
+        except ConnectError as err:
+            return self.send_connect_error(start_response, [], err)
+        except Exception as err:
+            err = ConnectError(ConnectErrorCode.INTERNAL, str(err))
+            return self.send_connect_error(start_response, [], err)
+            
     def call_unary(
         self, environ: WSGIEnvironment, start_response: StartResponse, rpc: UnaryRPC[Any, Any]
     ) -> Iterable[bytes]:

@@ -1,7 +1,7 @@
 import sys
 from typing import Any
 
-DISABLED = True
+DISABLED = False
 
 
 def debug(*args: Any) -> None:

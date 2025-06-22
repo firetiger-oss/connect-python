@@ -28,6 +28,8 @@ from connectrpc.server_sync import ClientStream
 from connectrpc.server_sync import ServerResponse
 from connectrpc.server_sync import ServerStream
 
+from connectrpc.debugprint import debug
+
 
 class Conformance:
     def unary(self, req: ClientRequest[UnaryRequest]) -> ServerResponse[UnaryResponse]:
@@ -57,7 +59,8 @@ class Conformance:
         raise NotImplementedError
 
 
-def prepare_sync(sc_req: ServerCompatRequest) -> ServerCompatResponse:
+def prepare_sync(sc_req: ServerCompatRequest) -> tuple[ServerCompatResponse, WSGIServer]:
+    debug("received sync request", sc_req)
     app = Conformance()
     wsgi_app = wsgi_conformance_service(app)
     server = WSGIServer(("127.0.0.1", 0), WSGIRequestHandler)
@@ -71,9 +74,10 @@ def prepare_sync(sc_req: ServerCompatRequest) -> ServerCompatResponse:
         pem_cert = None
 
     address = server.socket.getsockname()
+    debug("running server at ", address)
     response = ServerCompatResponse(host=address[0], port=address[1], pem_cert=pem_cert)
-
-    return response
+    debug(response)
+    return response, server
 
 
 def create_ssl_context_from_tls_creds(tls_creds: TLSCreds) -> ssl.SSLContext:
@@ -107,19 +111,20 @@ def main(mode: str) -> None:
             if message_bytes is None:
                 break  # EOF
 
-            # Parse the request
+
             request = ServerCompatRequest()
             request.ParseFromString(message_bytes)
 
-            # Handle the request
             if mode == "async":
                 raise NotImplementedError
             elif mode == "sync":
-                response = prepare_sync(request)
+                response, server = prepare_sync(request)
             else:
                 raise NotImplementedError
 
             write_size_delimited_message(response.SerializeToString())
+            server.serve_forever()
+            return
 
         except Exception as e:
             sys.stderr.write(f"Error processing request: {e}\n")

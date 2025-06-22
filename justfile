@@ -92,7 +92,7 @@ conformance-test-server-sync *ARGS:
 
     connectconformance \
         --conf ./sync_config.yaml \
-        --mode client \
+        --mode server \
         {{ARGS}} \
         -- \
     	uv run python conformance_server.py sync
