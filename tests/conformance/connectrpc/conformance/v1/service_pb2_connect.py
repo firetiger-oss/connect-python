@@ -1,21 +1,36 @@
 # Generated Connect client code
 
+from __future__ import annotations
 from collections.abc import AsyncIterator
 from collections.abc import Iterator
 from collections.abc import Iterable
 import aiohttp
 import urllib3
+import typing
+import sys
 
 from connectrpc.client_async import AsyncConnectClient
 from connectrpc.client_sync import ConnectClient
 from connectrpc.client_protocol import ConnectProtocol
 from connectrpc.client_connect import ConnectProtocolError
 from connectrpc.headers import HeaderInput
+from connectrpc.server_sync import ClientRequest
+from connectrpc.server_sync import ClientStream
+from connectrpc.server_sync import ConnectWSGI
+from connectrpc.server_sync import ServerResponse
+from connectrpc.server_sync import ServerStream
 from connectrpc.streams import StreamInput
 from connectrpc.streams import AsyncStreamOutput
 from connectrpc.streams import StreamOutput
 from connectrpc.unary import UnaryOutput
 from connectrpc.unary import ClientStreamingOutput
+
+if typing.TYPE_CHECKING:
+    # wsgiref.types was added in Python 3.11.
+    if sys.version_info >= (3, 11):
+        from wsgiref.types import WSGIApplication
+    else:
+        from _typeshed.wsgi import WSGIApplication
 
 import connectrpc.conformance.v1.service_pb2
 
@@ -294,3 +309,30 @@ class AsyncConformanceServiceClient:
             raise ConnectProtocolError('missing response message')
         return msg
 
+
+@typing.runtime_checkable
+class ConformanceServiceProtocol(typing.Protocol):
+    def unary(self, req: ClientRequest[connectrpc.conformance.v1.service_pb2.UnaryRequest]) -> ServerResponse[connectrpc.conformance.v1.service_pb2.UnaryResponse]:
+        ...
+    def server_stream(self, req: ClientRequest[connectrpc.conformance.v1.service_pb2.ServerStreamRequest]) -> ServerStream[connectrpc.conformance.v1.service_pb2.ServerStreamResponse]:
+        ...
+    def client_stream(self, req: ClientStream[connectrpc.conformance.v1.service_pb2.ClientStreamRequest]) -> ServerResponse[connectrpc.conformance.v1.service_pb2.ClientStreamResponse]:
+        ...
+    def bidi_stream(self, req: ClientStream[connectrpc.conformance.v1.service_pb2.BidiStreamRequest]) -> ServerStream[connectrpc.conformance.v1.service_pb2.BidiStreamResponse]:
+        ...
+    def unimplemented(self, req: ClientRequest[connectrpc.conformance.v1.service_pb2.UnimplementedRequest]) -> ServerResponse[connectrpc.conformance.v1.service_pb2.UnimplementedResponse]:
+        ...
+    def idempotent_unary(self, req: ClientRequest[connectrpc.conformance.v1.service_pb2.IdempotentUnaryRequest]) -> ServerResponse[connectrpc.conformance.v1.service_pb2.IdempotentUnaryResponse]:
+        ...
+
+CONFORMANCE_SERVICE_PATH_PREFIX = "/connectrpc.conformance.v1.ConformanceService"
+
+def wsgi_conformance_service(implementation: ConformanceServiceProtocol) -> WSGIApplication:
+    app = ConnectWSGI()
+    app.register_unary_rpc("/connectrpc.conformance.v1.ConformanceService/Unary", implementation.unary)
+    app.register_server_streaming_rpc("/connectrpc.conformance.v1.ConformanceService/ServerStream", implementation.server_stream)
+    app.register_client_streaming_rpc("/connectrpc.conformance.v1.ConformanceService/ClientStream", implementation.client_stream)
+    app.register_bidi_streaming_rpc("/connectrpc.conformance.v1.ConformanceService/BidiStream", implementation.bidi_stream)
+    app.register_unary_rpc("/connectrpc.conformance.v1.ConformanceService/Unimplemented", implementation.unimplemented)
+    app.register_unary_rpc("/connectrpc.conformance.v1.ConformanceService/IdempotentUnary", implementation.idempotent_unary)
+    return app

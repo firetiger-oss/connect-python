@@ -1,4 +1,5 @@
 import protogen
+import protogen._case
 
 # Universal arguments on all RPC methods
 common_params = [
@@ -13,6 +14,76 @@ common_args = [
     "timeout_seconds",
 ]
 common_args_str = ", ".join(common_args)
+
+
+def rpc_url_str(f: protogen.File, s: protogen.Service, m: protogen.Method) -> str:
+    route = f"{s.proto.name}/{m.proto.name}"
+    if f.proto.package != "":
+        route = f.proto.package + "." + route
+    return f'"/{route}"'
+
+
+def service_url_prefix(f: protogen.File, s: protogen.Service) -> str:
+    route = s.proto.name
+    if f.proto.package != "":
+        route = f.proto.package + "." + route
+    return f'"/{route}"'
+
+
+def generate(gen: protogen.Plugin) -> None:
+    for f in gen.files_to_generate:
+        if len(f.services) == 0:
+            continue
+
+        g = gen.new_generated_file(
+            f.proto.name.replace(".proto", "_pb2_connect.py"),
+            import_path(f),
+        )
+
+        g.P("# Generated Connect client code")
+        g.P()
+        g.P("from __future__ import annotations")
+        g.P("from collections.abc import AsyncIterator")
+        g.P("from collections.abc import Iterator")
+        g.P("from collections.abc import Iterable")
+        g.P("import aiohttp")
+        g.P("import urllib3")
+        g.P("import typing")
+        g.P("import sys")
+        g.P()
+        g.P("from connectrpc.client_async import AsyncConnectClient")
+        g.P("from connectrpc.client_sync import ConnectClient")
+        g.P("from connectrpc.client_protocol import ConnectProtocol")
+        g.P("from connectrpc.client_connect import ConnectProtocolError")
+        g.P("from connectrpc.headers import HeaderInput")
+        g.P("from connectrpc.server_sync import ClientRequest")
+        g.P("from connectrpc.server_sync import ClientStream")
+        g.P("from connectrpc.server_sync import ConnectWSGI")
+        g.P("from connectrpc.server_sync import ServerResponse")
+        g.P("from connectrpc.server_sync import ServerStream")
+        g.P("from connectrpc.streams import StreamInput")
+        g.P("from connectrpc.streams import AsyncStreamOutput")
+        g.P("from connectrpc.streams import StreamOutput")
+        g.P("from connectrpc.unary import UnaryOutput")
+        g.P("from connectrpc.unary import ClientStreamingOutput")
+        g.P()
+        g.P("if typing.TYPE_CHECKING:")
+        g.P("    # wsgiref.types was added in Python 3.11.")
+        g.P("    if sys.version_info >= (3, 11):")
+        g.P("        from wsgiref.types import WSGIApplication")
+        g.P("    else:")
+        g.P("        from _typeshed.wsgi import WSGIApplication")
+        g.P()
+        g.print_import()
+        g.P()
+
+        for s in f.services:
+            SyncClientGenerator(g, f, s).generate()
+            g.P()
+            AsyncClientGenerator(g, f, s).generate()
+            g.P()
+            WSGIServerGenerator(g, f, s).generate()
+            g.P()
 
 
 def docstring(g: protogen.GeneratedFile, *args: str) -> None:
@@ -68,15 +139,7 @@ class SyncClientGenerator:
             m.proto.name,
             ", granting access to errors and metadata",
         )
-        self.g.P(
-            'url = self.base_url + "/',
-            self.f.proto.package,
-            ".",
-            self.s.proto.name,
-            "/",
-            m.proto.name,
-            '"',
-        )
+        self.g.P("url = self.base_url + ", rpc_url_str(self.f, self.s, m))
         self.g.P(
             "return self._connect_client.call_unary(url, req, ",
             m.output.py_ident,
@@ -130,15 +193,7 @@ class SyncClientGenerator:
             ", granting access to errors and metadata",
         )
         self.g.set_indent(4)
-        self.g.P(
-            '    url = self.base_url + "/',
-            self.f.proto.package,
-            ".",
-            self.s.proto.name,
-            "/",
-            m.proto.name,
-            '"',
-        )
+        self.g.P("    url = self.base_url + ", rpc_url_str(self.f, self.s, m))
         self.g.P("    return self._connect_client.call_server_streaming(")
         self.g.P("        url, req, ", m.output.py_ident, ", ", common_args_str)
         self.g.P("    )")
@@ -156,15 +211,7 @@ class SyncClientGenerator:
             ", granting access to errors and metadata",
         )
         self.g.set_indent(4)
-        self.g.P(
-            '    url = self.base_url + "/',
-            self.f.proto.package,
-            ".",
-            self.s.proto.name,
-            "/",
-            m.proto.name,
-            '"',
-        )
+        self.g.P("    url = self.base_url + ", rpc_url_str(self.f, self.s, m))
         self.g.P("    return self._connect_client.call_client_streaming(")
         self.g.P("        url, reqs, ", m.output.py_ident, ", ", common_args_str)
         self.g.P("    )")
@@ -219,15 +266,7 @@ class SyncClientGenerator:
             ", granting access to errors and metadata",
         )
         self.g.set_indent(4)
-        self.g.P(
-            '    url = self.base_url + "/',
-            self.f.proto.package,
-            ".",
-            self.s.proto.name,
-            "/",
-            m.proto.name,
-            '"',
-        )
+        self.g.P("    url = self.base_url + ", rpc_url_str(self.f, self.s, m))
         self.g.P("    return self._connect_client.call_bidirectional_streaming(")
         self.g.P("        url, reqs, ", m.output.py_ident, ", ", common_args_str)
         self.g.P("    )")
@@ -285,15 +324,7 @@ class AsyncClientGenerator:
             m.proto.name,
             ", granting access to errors and metadata",
         )
-        self.g.P(
-            'url = self.base_url + "/',
-            self.f.proto.package,
-            ".",
-            self.s.proto.name,
-            "/",
-            m.proto.name,
-            '"',
-        )
+        self.g.P("url = self.base_url + ", rpc_url_str(self.f, self.s, m))
         self.g.P(
             "return await self._connect_client.call_unary(url, req, ",
             m.output.py_ident,
@@ -350,15 +381,7 @@ class AsyncClientGenerator:
             ", granting access to errors and metadata",
         )
         self.g.set_indent(4)
-        self.g.P(
-            '    url = self.base_url + "/',
-            self.f.proto.package,
-            ".",
-            self.s.proto.name,
-            "/",
-            m.proto.name,
-            '"',
-        )
+        self.g.P("    url = self.base_url + ", rpc_url_str(self.f, self.s, m))
         self.g.P("    return await self._connect_client.call_server_streaming(")
         self.g.P("        url, req, ", m.output.py_ident, ", ", common_args_str)
         self.g.P("    )")
@@ -442,58 +465,140 @@ class AsyncClientGenerator:
             ", granting access to errors and metadata",
         )
         self.g.set_indent(4)
-        self.g.P(
-            '    url = self.base_url + "/',
-            self.f.proto.package,
-            ".",
-            self.s.proto.name,
-            "/",
-            m.proto.name,
-            '"',
-        )
+        self.g.P("    url = self.base_url + ", rpc_url_str(self.f, self.s, m))
         self.g.P("    return await self._connect_client.call_bidirectional_streaming(")
         self.g.P("        url, reqs, ", m.output.py_ident, ", ", common_args_str)
         self.g.P("    )")
         self.g.P()
 
 
-def generate(gen: protogen.Plugin) -> None:
-    for f in gen.files_to_generate:
-        if len(f.services) == 0:
-            continue
+class WSGIServerGenerator:
+    def __init__(self, g: protogen.GeneratedFile, f: protogen.File, s: protogen.Service):
+        self.g = g
+        self.f = f
+        self.s = s
 
-        g = gen.new_generated_file(
-            f.proto.name.replace(".proto", "_pb2_connect.py"),
-            import_path(f),
+    def generate(self) -> None:
+        self.g.set_indent(0)
+        self.generate_protocol()
+        self.g.P()
+        self.generate_path_prefix_const()
+        self.g.P()
+        self.generate_wsgi_constructor()
+
+    def generate_wsgi_constructor(self) -> None:
+        service_name = self.g.qualified_py_ident(
+            protogen.PyIdent(import_path(self.f), self.s.proto.name)
+        )
+        service_name = protogen._case.snake_case(service_name)
+
+        self.g.set_indent(0)
+        self.g.P(
+            "def wsgi_",
+            service_name,
+            "(implementation: ",
+            self.protocol_name(),
+            ") -> WSGIApplication:",
+        )
+        self.g.P("    app = ConnectWSGI()")
+        for m in self.s.methods:
+            assert m.input is not None, f"Method {m.py_name} input should be resolved"
+            assert m.output is not None, f"Method {m.py_name} output should be resolved"
+
+            if not m.proto.client_streaming and not m.proto.server_streaming:
+                self.g.P(
+                    f"    app.register_unary_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name})"
+                )
+            elif not m.proto.client_streaming and m.proto.server_streaming:
+                self.g.P(
+                    f"    app.register_server_streaming_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name})"
+                )
+            elif m.proto.client_streaming and not m.proto.server_streaming:
+                self.g.P(
+                    f"    app.register_client_streaming_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name})"
+                )
+            elif m.proto.client_streaming and m.proto.server_streaming:
+                self.g.P(
+                    f"    app.register_bidi_streaming_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name})"
+                )
+
+        self.g.P("    return app")
+
+    def generate_path_prefix_const(self) -> None:
+        self.g.set_indent(0)
+
+        all_caps_name = protogen._case.snake_case(self.s.proto.name).upper()
+        self.g.P(f"{all_caps_name}_PATH_PREFIX = {service_url_prefix(self.f, self.s)}")
+
+    def protocol_name(self) -> str:
+        return (
+            self.g.qualified_py_ident(protogen.PyIdent(import_path(self.f), self.s.proto.name))
+            + "Protocol"
         )
 
-        g.P("# Generated Connect client code")
-        g.P()
-        g.P("from collections.abc import AsyncIterator")
-        g.P("from collections.abc import Iterator")
-        g.P("from collections.abc import Iterable")
-        g.P("import aiohttp")
-        g.P("import urllib3")
-        g.P()
-        g.P("from connectrpc.client_async import AsyncConnectClient")
-        g.P("from connectrpc.client_sync import ConnectClient")
-        g.P("from connectrpc.client_protocol import ConnectProtocol")
-        g.P("from connectrpc.client_connect import ConnectProtocolError")
-        g.P("from connectrpc.headers import HeaderInput")
-        g.P("from connectrpc.streams import StreamInput")
-        g.P("from connectrpc.streams import AsyncStreamOutput")
-        g.P("from connectrpc.streams import StreamOutput")
-        g.P("from connectrpc.unary import UnaryOutput")
-        g.P("from connectrpc.unary import ClientStreamingOutput")
-        g.P()
-        g.print_import()
-        g.P()
+    def generate_protocol(self) -> None:
+        self.g.P("@typing.runtime_checkable")
+        self.g.P("class ", self.protocol_name(), "(typing.Protocol):")
+        for m in self.s.methods:
+            assert m.input is not None, f"Method {m.py_name} input should be resolved"
+            assert m.output is not None, f"Method {m.py_name} output should be resolved"
 
-        for s in f.services:
-            SyncClientGenerator(g, f, s).generate()
-            g.P()
-            AsyncClientGenerator(g, f, s).generate()
-            g.P()
+            if not m.proto.client_streaming and not m.proto.server_streaming:
+                self.generate_unary_protocol(m)
+            elif not m.proto.client_streaming and m.proto.server_streaming:
+                self.generate_server_streaming_protocol(m)
+            elif m.proto.client_streaming and not m.proto.server_streaming:
+                self.generate_client_streaming_protocol(m)
+            elif m.proto.client_streaming and m.proto.server_streaming:
+                self.generate_bidirectional_streaming_protocol(m)
+
+    def generate_unary_protocol(self, m: protogen.Method) -> None:
+        self.g.P(
+            "    def ",
+            m.py_name,
+            "(self, req: ClientRequest[",
+            m.input.py_ident,
+            "]) -> ServerResponse[",
+            m.output.py_ident,
+            "]:",
+        )
+        self.g.P("        ...")
+
+    def generate_server_streaming_protocol(self, m: protogen.Method) -> None:
+        self.g.P(
+            "    def ",
+            m.py_name,
+            "(self, req: ClientRequest[",
+            m.input.py_ident,
+            "]) -> ServerStream[",
+            m.output.py_ident,
+            "]:",
+        )
+        self.g.P("        ...")
+
+    def generate_client_streaming_protocol(self, m: protogen.Method) -> None:
+        self.g.P(
+            "    def ",
+            m.py_name,
+            "(self, req: ClientStream[",
+            m.input.py_ident,
+            "]) -> ServerResponse[",
+            m.output.py_ident,
+            "]:",
+        )
+        self.g.P("        ...")
+
+    def generate_bidirectional_streaming_protocol(self, m: protogen.Method) -> None:
+        self.g.P(
+            "    def ",
+            m.py_name,
+            "(self, req: ClientStream[",
+            m.input.py_ident,
+            "]) -> ServerStream[",
+            m.output.py_ident,
+            "]:",
+        )
+        self.g.P("        ...")
 
 
 def gather_message_types(g: protogen.GeneratedFile, f: protogen.File) -> list[protogen.Message]:
