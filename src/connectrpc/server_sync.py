@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import http
 import sys
 from collections.abc import Callable
 from collections.abc import Iterable
@@ -51,15 +50,17 @@ class ClientRequest(Generic[T]):
 class ServerResponse(Generic[T]):
     def __init__(
         self,
-        msg: T | ConnectError,
+        payload: T | ConnectError,
         headers: CIMultiDict[str] | None = None,
         trailers: CIMultiDict[str] | None = None,
     ):
-        if isinstance(msg, ConnectError):
+        self.msg: T | None
+        self.error: ConnectError | None
+        if isinstance(payload, ConnectError):
             self.msg = None
-            self.error = msg
+            self.error = payload
         else:
-            self.msg = msg
+            self.msg = payload
             self.error = None
         if headers is None:
             headers = CIMultiDict()
@@ -128,7 +129,7 @@ class WSGIResponse:
 
     def __init__(self, start_response: StartResponse):
         self.start_response = start_response
-        self.status = http.HTTPStatus.OK
+        self.status_line = "200 OK"
         self.headers: CIMultiDict[str] = CIMultiDict()
         self.body: Iterable[bytes] = []
 
@@ -150,28 +151,28 @@ class WSGIResponse:
         """
         self.body = body
 
-    def set_status(self, status: http.HTTPStatus) -> None:
+    def set_status_line(self, status_line: str) -> None:
         """
-        Set the HTTP status code that will be set.
+        Set the HTTP Status-Line that will be set.
         """
-        self.status = status
+        self.status_line = status_line
 
     def set_from_error(self, err: ConnectError) -> None:
         """
         Configure the WSGIResponse from a Connect error
         """
-        self.set_status(http.HTTPStatus(err.code.value[1]))
+        self.set_status_line(err.code.http_status_line())
         body = err.to_json().encode()
         self.set_header("Content-Type", "application/json")
         self.set_header("Content-Length", str(len(body)))
+        debug(body)
         self.set_body([body])
 
     def send_headers(self) -> None:
-        status_line = str(self.status.value) + " " + self.status.phrase
         headers = []
         for k, v in self.headers.items():
             headers.append((str(k), str(v)))
-        self.start_response(status_line, headers)
+        self.start_response(self.status_line, headers)
 
     def send(self) -> Iterable[bytes]:
         self.send_headers()
@@ -234,7 +235,7 @@ class ConnectWSGI:
         # First, ensure the method is valid.
         method = req.method
         if method != "POST":
-            resp.set_status(http.HTTPStatus.METHOD_NOT_ALLOWED)
+            resp.set_status_line("405 Method Not Allowed")
             resp.add_header("Allow", "POST")
             return resp.send()
 
@@ -277,7 +278,7 @@ class ConnectWSGI:
             serialization = CONNECT_JSON_SERIALIZATION
         else:
             debug("unexpected serialization: ", req.content_type)
-            resp.set_status(http.HTTPStatus.UNSUPPORTED_MEDIA_TYPE)
+            resp.set_status_line("415 Unsupported Media Type")
             resp.set_header("Accept-Post", "application/json, application/proto")
             return
 
@@ -329,7 +330,6 @@ class ConnectWSGI:
 
         server_resp = self.unary_rpcs[req.path](client_req)
 
-        resp.set_status(http.HTTPStatus.OK)
         for k, v in server_resp.headers.items():
             resp.add_header(k, v)
         for k, v in server_resp.trailers.items():

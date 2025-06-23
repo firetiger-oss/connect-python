@@ -4,10 +4,10 @@ import ssl
 import sys
 import tempfile
 import time
-from wsgiref.simple_server import WSGIServer
+from typing import TYPE_CHECKING
 
 from google.protobuf.any_pb2 import Any as ProtoAny
-from gunicorn.app.base import BaseApplication
+from gunicorn.app.base import BaseApplication  # type:ignore[import-untyped]
 from multidict import CIMultiDict
 
 from conformance import multidict_to_proto
@@ -31,13 +31,19 @@ from connectrpc.conformance.v1.service_pb2 import UnaryResponse
 from connectrpc.conformance.v1.service_pb2 import UnimplementedRequest
 from connectrpc.conformance.v1.service_pb2 import UnimplementedResponse
 from connectrpc.conformance.v1.service_pb2_connect import wsgi_conformance_service
-from connectrpc.debugprint import debug
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
 from connectrpc.server_sync import ClientRequest
 from connectrpc.server_sync import ClientStream
 from connectrpc.server_sync import ServerResponse
 from connectrpc.server_sync import ServerStream
+
+if TYPE_CHECKING:
+    # wsgiref.types was added in Python 3.11.
+    if sys.version_info >= (3, 11):
+        from wsgiref.types import WSGIApplication
+    else:
+        from _typeshed.wsgi import WSGIApplication
 
 
 class Conformance:
@@ -83,11 +89,8 @@ class Conformance:
                 Code.CODE_DATA_LOSS: ConnectErrorCode.DATA_LOSS,
                 Code.CODE_UNAUTHENTICATED: ConnectErrorCode.UNAUTHENTICATED,
             }[req.msg.response_definition.error.code]
-            details = ProtoAny()
-            details.Pack(req_info)
-            req_details = req.msg.response_definition.error.details
-            req_details.append(details)
-            err = ConnectError(code, req.msg.response_definition.error.message, req_details)
+            err = ConnectError(code, req.msg.response_definition.error.message)
+            err.add_detail(req_info, include_debug=True)
             return ServerResponse(err, headers, trailers)
 
         else:
@@ -123,21 +126,29 @@ class Conformance:
         raise NotImplementedError
 
 
-class SocketGunicornApp(BaseApplication):
-    def __init__(self, app, sock):
+class SocketGunicornApp(BaseApplication):  # type:ignore[misc]
+    """A barebones gunicorn WSGI server which runs a configured WSGI
+    application on a pre-established socket.
+
+    Using a pre-established socket lets us know the port that will be
+    used *before* we call server.run().
+
+    """
+
+    def __init__(self, app: WSGIApplication, sock: socket.socket):
         self.app = app
         self.sock = sock
         super().__init__()
 
-    def load_config(self):
+    def load_config(self) -> None:
         # Tell Gunicorn to use our pre-bound socket
         self.cfg.set("bind", f"fd://{self.sock.fileno()}")
 
-    def load(self):
+    def load(self) -> WSGIApplication:
         return self.app
 
 
-def create_bound_socket():
+def create_bound_socket() -> tuple[socket.socket, int]:
     """Create and bind a socket, return socket and port"""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -148,15 +159,20 @@ def create_bound_socket():
     return sock, port
 
 
-def prepare_sync(sc_req: ServerCompatRequest) -> tuple[ServerCompatResponse, WSGIServer]:
-    debug("received sync request", sc_req)
+def prepare_sync(sc_req: ServerCompatRequest) -> tuple[ServerCompatResponse, SocketGunicornApp]:
+    """Create the WSGI application, wrap it in a server, set up a
+    socket, and build the ServerCompatResponse we'll send back to the
+    test runner, informing it of the port the server will be on.
+
+    The server isn't actually started here because that is a blocking call.
+
+    """
     app = Conformance()
     wsgi_app = wsgi_conformance_service(app)
     sock, port = create_bound_socket()
     server = SocketGunicornApp(wsgi_app, sock)
 
     response = ServerCompatResponse(host="127.0.0.1", port=port)
-    debug(response)
     return response, server
 
 
