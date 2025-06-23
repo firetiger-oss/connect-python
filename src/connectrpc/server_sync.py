@@ -203,7 +203,7 @@ class ConnectRequest:
         req: WSGIRequest, resp: WSGIResponse, streaming: bool
     ) -> ConnectSerialization | None:
         if streaming:
-            if not req.content_type.startsith("application/connect+"):
+            if not req.content_type.startswith("application/connect+"):
                 resp.set_status_line("415 Unsupported Media Type")
                 resp.set_header(
                     "Accept-Post", "application/connect+json, application/connect+proto"
