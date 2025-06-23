@@ -12,11 +12,13 @@ from typing import TypeVar
 from google.protobuf.message import Message
 from multidict import CIMultiDict
 
+from .connect_compression import CompressionCodec
 from .connect_compression import load_compression
 from .connect_compression import supported_compression
 from .connect_compression import supported_compressions
 from .connect_serialization import CONNECT_JSON_SERIALIZATION
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
+from .connect_serialization import ConnectSerialization
 from .debugprint import debug
 from .errors import ConnectError
 from .errors import ConnectErrorCode
@@ -118,8 +120,143 @@ class WSGIRequest:
         self.content_length = int(environ.get("CONTENT_LENGTH", 0) or 0)
         self.input: WSGIInputStream = environ["wsgi.input"]
 
-        compression_codec = load_compression(self.headers.get("content-encoding", "identity"))
-        self.body = StreamReader(self.input, compression_codec.decompressor(), self.content_length)
+
+class ConnectRequest:
+    """
+    Enriches a plain WSGIRequest with streaming decompression and deserialization.
+    """
+
+    def __init__(
+        self,
+        wsgi_req: WSGIRequest,
+        compression: CompressionCodec,
+        serialization: ConnectSerialization,
+        timeout: ConnectTimeout,
+    ):
+        self.body = StreamReader(
+            wsgi_req.input, compression.decompressor(), wsgi_req.content_length
+        )
+        self.compression = compression
+        self.serialization = serialization
+        self.timeout = timeout
+
+        self.path = wsgi_req.path
+        self.headers = wsgi_req.headers
+
+    @classmethod
+    def from_req(
+        cls, req: WSGIRequest, resp: WSGIResponse, streaming: bool
+    ) -> ConnectRequest | None:
+        if not ConnectRequest.validate_connect_protocol_header(req, resp):
+            return None
+
+        compression = ConnectRequest.validate_compression(req, resp)
+        if compression is None:
+            return None
+
+        serialization = ConnectRequest.validate_content_type(req, resp, streaming)
+        if serialization is None:
+            return None
+
+        timeout = ConnectRequest.validate_timeout(req, resp)
+        if timeout is None:
+            return None
+
+        return ConnectRequest(req, compression, serialization, timeout)
+
+    @staticmethod
+    def validate_connect_protocol_header(req: WSGIRequest, resp: WSGIResponse) -> bool:
+        """Make sure the connect-protocol-version header is set
+        correctly. Returns True if, else False. In the false case, it
+        sets the response.
+
+        """
+        connect_protocol_version = req.headers.get("connect-protocol-version")
+        if connect_protocol_version is None:
+            err = ConnectError(
+                ConnectErrorCode.INVALID_ARGUMENT, "connect-protocol-version header must be set"
+            )
+            resp.set_from_error(err)
+            return False
+
+        if connect_protocol_version != "1":
+            err = ConnectError(
+                ConnectErrorCode.INVALID_ARGUMENT,
+                "unsupported connect-protocol-version; only version 1 is supported",
+            )
+            resp.set_from_error(err)
+            return False
+        return True
+
+    @staticmethod
+    def validate_compression(req: WSGIRequest, resp: WSGIResponse) -> CompressionCodec | None:
+        encoding = req.headers.get("content-encoding", "identity")
+        if not supported_compression(encoding):
+            err_msg = f"content-encoding {encoding} is not supported. Supported values are {supported_compressions()}"
+            err = ConnectError(ConnectErrorCode.UNIMPLEMENTED, err_msg)
+            resp.set_from_error(err)
+            return None
+        return load_compression(encoding)
+
+    @staticmethod
+    def validate_content_type(
+        req: WSGIRequest, resp: WSGIResponse, streaming: bool
+    ) -> ConnectSerialization | None:
+        if streaming:
+            if not req.content_type.startsith("application/connect+"):
+                resp.set_status_line("415 Unsupported Media Type")
+                resp.set_header(
+                    "Accept-Post", "application/connect+json, application/connect+proto"
+                )
+                return None
+
+            if req.content_type == "application/connect+proto":
+                serialization = CONNECT_PROTOBUF_SERIALIZATION
+            elif req.content_type == "application/connect+json":
+                serialization = CONNECT_JSON_SERIALIZATION
+            else:
+                err = ConnectError(
+                    ConnectErrorCode.UNIMPLEMENTED,
+                    f"{req.content_type} codec not implemented; only application/connect+proto and application/connect+json are supported",
+                )
+                resp.set_from_error(err)
+                return None
+        else:
+            if req.content_type == "application/proto":
+                serialization = CONNECT_PROTOBUF_SERIALIZATION
+            elif req.content_type == "application/json":
+                serialization = CONNECT_JSON_SERIALIZATION
+            else:
+                resp.set_status_line("415 Unsupported Media Type")
+                resp.set_header("Accept-Post", "application/json, application/proto")
+                return None
+        return serialization
+
+    @staticmethod
+    def validate_timeout(req: WSGIRequest, resp: WSGIResponse) -> ConnectTimeout | None:
+        timeout_ms_header = req.headers.get("connect-timeout-ms")
+        if timeout_ms_header is not None:
+            try:
+                timeout_ms = int(timeout_ms_header)
+            except ValueError:
+                err = ConnectError(
+                    ConnectErrorCode.INVALID_ARGUMENT,
+                    "connect-timeout-ms header must be an integer",
+                )
+                resp.set_from_error(err)
+                return None
+        else:
+            timeout_ms = None
+        return ConnectTimeout(timeout_ms)
+
+
+class ConnectTimeout:
+    """
+    Tiny wrapper to help distinguish between unset and invalid connect timeouts.
+    """
+
+    def __init__(self, timeout_ms: int | None):
+        self.timeout_ms = timeout_ms
 
 
 class WSGIResponse:
@@ -164,6 +301,7 @@ class WSGIResponse:
         self.set_status_line(err.code.http_status_line())
         body = err.to_json().encode()
         self.set_header("Content-Type", "application/json")
+        self.set_header("Content-Encoding", "identity")
         self.set_header("Content-Length", str(len(body)))
         debug(body)
         self.set_body([body])
@@ -272,75 +410,37 @@ class ConnectWSGI:
             return resp.send()
 
     def call_unary(self, req: WSGIRequest, resp: WSGIResponse) -> None:
-        if req.content_type == "application/proto":
-            serialization = CONNECT_PROTOBUF_SERIALIZATION
-        elif req.content_type == "application/json":
-            serialization = CONNECT_JSON_SERIALIZATION
-        else:
-            debug("unexpected serialization: ", req.content_type)
-            resp.set_status_line("415 Unsupported Media Type")
-            resp.set_header("Accept-Post", "application/json, application/proto")
+        connect_req = ConnectRequest.from_req(req, resp, False)
+        if connect_req is None:
             return
+        del req
 
-        connect_protocol_version = req.headers.get("connect-protocol-version")
-        if connect_protocol_version is None:
-            err = ConnectError(
-                ConnectErrorCode.INVALID_ARGUMENT, "connect-protocol-version header must be set"
-            )
-            resp.set_from_error(err)
-            return
-
-        if connect_protocol_version != "1":
-            err = ConnectError(
-                ConnectErrorCode.INVALID_ARGUMENT,
-                "unsupported connect-protocol-version; only version 1 is supported",
-            )
-            resp.set_from_error(err)
-            return
-
-        encoding = req.headers.get("content-encoding", "identity")
-        if not supported_compression(encoding):
-            err_msg = f"content-encoding {encoding} is not supported. Supported values are {supported_compressions()}"
-            err = ConnectError(ConnectErrorCode.UNIMPLEMENTED, err_msg)
-            resp.set_from_error(err)
-            return
-
-        timeout_ms_header = req.headers.get("connect-timeout-ms")
-        if timeout_ms_header is not None:
-            try:
-                timeout_ms = int(timeout_ms_header)
-            except ValueError:
-                err = ConnectError(
-                    ConnectErrorCode.INVALID_ARGUMENT,
-                    "connect-timeout-ms header must be an integer",
-                )
-                resp.set_from_error(err)
-        else:
-            timeout_ms = None
-
-        msg_data = req.body.readall()
-        msg = serialization.deserialize(bytes(msg_data), self.rpc_input_types[req.path])
+        msg_data = connect_req.body.readall()
+        msg = connect_req.serialization.deserialize(
+            bytes(msg_data), self.rpc_input_types[connect_req.path]
+        )
 
         trailers: CIMultiDict[str] = CIMultiDict()
-        for k, v in req.headers.items():
+        for k, v in connect_req.headers.items():
             if k.startswith("trailer-"):
                 trailers.add(k, v)
 
-        client_req = ClientRequest(msg, req.headers, trailers, timeout_ms)
+        client_req = ClientRequest(
+            msg, connect_req.headers, trailers, connect_req.timeout.timeout_ms
+        )
 
-        server_resp = self.unary_rpcs[req.path](client_req)
+        server_resp = self.unary_rpcs[connect_req.path](client_req)
 
         for k, v in server_resp.headers.items():
             resp.add_header(k, v)
         for k, v in server_resp.trailers.items():
             resp.add_header("trailer-" + k, v)
 
-        resp.set_header("content-type", req.content_type)
-        # TODO: encode responses
-        resp.set_header("content-encoding", "identity")
-
         if server_resp.msg is not None:
-            encoded = serialization.serialize(server_resp.msg)
+            encoded = connect_req.serialization.serialize(server_resp.msg)
+            resp.set_header("content-type", connect_req.serialization.unary_content_type)
+            encoded = connect_req.compression.compressor().compress(encoded)
+            resp.set_header("content-encoding", connect_req.compression.label)
             resp.set_header("content-length", str(len(encoded)))
             resp.set_body([encoded])
         elif server_resp.error is not None:
@@ -350,10 +450,19 @@ class ConnectWSGI:
         return
 
     def call_client_streaming(self, req: WSGIRequest, resp: WSGIResponse) -> None:
+        connect_req = ConnectRequest.from_req(req, resp, True)
+        if connect_req is None:
+            return None
         raise NotImplementedError
 
     def call_server_streaming(self, req: WSGIRequest, resp: WSGIResponse) -> None:
+        connect_req = ConnectRequest.from_req(req, resp, True)
+        if connect_req is None:
+            return None
         raise NotImplementedError
 
     def call_bidi_streaming(self, req: WSGIRequest, resp: WSGIResponse) -> None:
+        connect_req = ConnectRequest.from_req(req, resp, True)
+        if connect_req is None:
+            return None
         raise NotImplementedError
