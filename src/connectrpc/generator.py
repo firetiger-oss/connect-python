@@ -507,19 +507,27 @@ class WSGIServerGenerator:
 
             if not m.proto.client_streaming and not m.proto.server_streaming:
                 self.g.P(
-                    f"    app.register_unary_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name})"
+                    f"    app.register_unary_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name}, ",
+                    m.input.py_ident,
+                    ")",
                 )
             elif not m.proto.client_streaming and m.proto.server_streaming:
                 self.g.P(
-                    f"    app.register_server_streaming_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name})"
+                    f"    app.register_server_streaming_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name}, ",
+                    m.input.py_ident,
+                    ")",
                 )
             elif m.proto.client_streaming and not m.proto.server_streaming:
                 self.g.P(
-                    f"    app.register_client_streaming_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name})"
+                    f"    app.register_client_streaming_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name}, ",
+                    m.input.py_ident,
+                    ")",
                 )
             elif m.proto.client_streaming and m.proto.server_streaming:
                 self.g.P(
-                    f"    app.register_bidi_streaming_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name})"
+                    f"    app.register_bidi_streaming_rpc({rpc_url_str(self.f, self.s, m)}, implementation.{m.py_name}, ",
+                    m.input.py_ident,
+                    ")",
                 )
 
         self.g.P("    return app")

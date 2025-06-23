@@ -1,5 +1,66 @@
 import struct
 import sys
+import traceback
+
+# Imported for their side effects of loading protobuf registry
+import google.protobuf.descriptor_pb2  # noqa: F401
+import urllib3
+import urllib3.exceptions
+from google.protobuf.any_pb2 import Any as ProtoAny
+from multidict import MultiDict
+
+from connectrpc.client_connect import UnexpectedContentType
+from connectrpc.conformance.v1.config_pb2 import Code
+from connectrpc.conformance.v1.service_pb2 import Error
+from connectrpc.conformance.v1.service_pb2 import Header
+from connectrpc.errors import ConnectError
+from connectrpc.errors import ConnectErrorCode
+
+
+def exception_to_proto(error: Exception) -> Error:
+    if isinstance(error, TimeoutError):
+        error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
+    if isinstance(error, urllib3.exceptions.TimeoutError):
+        error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
+
+    if isinstance(error, UnexpectedContentType):
+        if error.content_type_received.startswith("application"):
+            # Fairly silly, but the test suite treats this differently
+            error = ConnectError(ConnectErrorCode.INTERNAL, str(error))
+        else:
+            error = ConnectError(ConnectErrorCode.UNKNOWN, str(error))
+
+    if not isinstance(error, ConnectError):
+        tb = traceback.format_tb(error.__traceback__)
+        error = ConnectError(ConnectErrorCode.INTERNAL, str(tb))
+
+    details: list[ProtoAny] = []
+    if isinstance(error.details, list):
+        for d in error.details:
+            v = ProtoAny()
+            v.Pack(d.message())
+            details.append(v)
+
+    code = {
+        ConnectErrorCode.CANCELED: Code.CODE_CANCELED,
+        ConnectErrorCode.UNKNOWN: Code.CODE_UNKNOWN,
+        ConnectErrorCode.INVALID_ARGUMENT: Code.CODE_INVALID_ARGUMENT,
+        ConnectErrorCode.DEADLINE_EXCEEDED: Code.CODE_DEADLINE_EXCEEDED,
+        ConnectErrorCode.NOT_FOUND: Code.CODE_NOT_FOUND,
+        ConnectErrorCode.ALREADY_EXISTS: Code.CODE_ALREADY_EXISTS,
+        ConnectErrorCode.PERMISSION_DENIED: Code.CODE_PERMISSION_DENIED,
+        ConnectErrorCode.RESOURCE_EXHAUSTED: Code.CODE_RESOURCE_EXHAUSTED,
+        ConnectErrorCode.FAILED_PRECONDITION: Code.CODE_FAILED_PRECONDITION,
+        ConnectErrorCode.ABORTED: Code.CODE_ABORTED,
+        ConnectErrorCode.OUT_OF_RANGE: Code.CODE_OUT_OF_RANGE,
+        ConnectErrorCode.UNIMPLEMENTED: Code.CODE_UNIMPLEMENTED,
+        ConnectErrorCode.INTERNAL: Code.CODE_INTERNAL,
+        ConnectErrorCode.UNAVAILABLE: Code.CODE_UNAVAILABLE,
+        ConnectErrorCode.DATA_LOSS: Code.CODE_DATA_LOSS,
+        ConnectErrorCode.UNAUTHENTICATED: Code.CODE_UNAUTHENTICATED,
+    }[error.code]
+
+    return Error(code=code, message=error.message, details=details)
 
 
 def read_size_delimited_message() -> bytes | None:
@@ -29,3 +90,10 @@ def write_size_delimited_message(message_bytes: bytes) -> None:
     # Write the actual message
     sys.stdout.buffer.write(message_bytes)
     sys.stdout.buffer.flush()
+
+
+def multidict_to_proto(headers: MultiDict[str]) -> list[Header]:
+    result = []
+    for k in headers:
+        result.append(Header(name=k, value=headers.getall(k)))
+    return result

@@ -262,11 +262,17 @@ ELIZA_SERVICE_PATH_PREFIX = "/connectrpc.eliza.v1.ElizaService"
 
 def wsgi_eliza_service(implementation: ElizaServiceProtocol) -> WSGIApplication:
     app = ConnectWSGI()
-    app.register_unary_rpc("/connectrpc.eliza.v1.ElizaService/Say", implementation.say)
+    app.register_unary_rpc(
+        "/connectrpc.eliza.v1.ElizaService/Say", implementation.say, eliza_pb2.SayRequest
+    )
     app.register_bidi_streaming_rpc(
-        "/connectrpc.eliza.v1.ElizaService/Converse", implementation.converse
+        "/connectrpc.eliza.v1.ElizaService/Converse",
+        implementation.converse,
+        eliza_pb2.ConverseRequest,
     )
     app.register_server_streaming_rpc(
-        "/connectrpc.eliza.v1.ElizaService/Introduce", implementation.introduce
+        "/connectrpc.eliza.v1.ElizaService/Introduce",
+        implementation.introduce,
+        eliza_pb2.IntroduceRequest,
     )
     return app

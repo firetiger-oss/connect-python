@@ -329,10 +329,10 @@ CONFORMANCE_SERVICE_PATH_PREFIX = "/connectrpc.conformance.v1.ConformanceService
 
 def wsgi_conformance_service(implementation: ConformanceServiceProtocol) -> WSGIApplication:
     app = ConnectWSGI()
-    app.register_unary_rpc("/connectrpc.conformance.v1.ConformanceService/Unary", implementation.unary)
-    app.register_server_streaming_rpc("/connectrpc.conformance.v1.ConformanceService/ServerStream", implementation.server_stream)
-    app.register_client_streaming_rpc("/connectrpc.conformance.v1.ConformanceService/ClientStream", implementation.client_stream)
-    app.register_bidi_streaming_rpc("/connectrpc.conformance.v1.ConformanceService/BidiStream", implementation.bidi_stream)
-    app.register_unary_rpc("/connectrpc.conformance.v1.ConformanceService/Unimplemented", implementation.unimplemented)
-    app.register_unary_rpc("/connectrpc.conformance.v1.ConformanceService/IdempotentUnary", implementation.idempotent_unary)
+    app.register_unary_rpc("/connectrpc.conformance.v1.ConformanceService/Unary", implementation.unary, connectrpc.conformance.v1.service_pb2.UnaryRequest)
+    app.register_server_streaming_rpc("/connectrpc.conformance.v1.ConformanceService/ServerStream", implementation.server_stream, connectrpc.conformance.v1.service_pb2.ServerStreamRequest)
+    app.register_client_streaming_rpc("/connectrpc.conformance.v1.ConformanceService/ClientStream", implementation.client_stream, connectrpc.conformance.v1.service_pb2.ClientStreamRequest)
+    app.register_bidi_streaming_rpc("/connectrpc.conformance.v1.ConformanceService/BidiStream", implementation.bidi_stream, connectrpc.conformance.v1.service_pb2.BidiStreamRequest)
+    app.register_unary_rpc("/connectrpc.conformance.v1.ConformanceService/Unimplemented", implementation.unimplemented, connectrpc.conformance.v1.service_pb2.UnimplementedRequest)
+    app.register_unary_rpc("/connectrpc.conformance.v1.ConformanceService/IdempotentUnary", implementation.idempotent_unary, connectrpc.conformance.v1.service_pb2.IdempotentUnaryRequest)
     return app

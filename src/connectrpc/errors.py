@@ -11,6 +11,8 @@ from enum import Enum
 from typing import Any
 from typing import Optional
 
+from google.protobuf.any_pb2 import Any as ProtoAny
+from google.protobuf.json_format import MessageToJson
 from google.protobuf.message import Message
 from google.protobuf.symbol_database import Default as DefaultSymbolDatabase
 from google.protobuf.symbol_database import SymbolDatabase
@@ -136,7 +138,7 @@ class ConnectError(Exception):
         self,
         code: ConnectErrorCode,
         message: str,
-        details: list[ConnectErrorDetail] | None = None,
+        details: list[ConnectErrorDetail | ProtoAny] | None = None,
         http_status: int | None = None,
     ):
         """Initialize a ConnectError.
@@ -165,7 +167,10 @@ class ConnectError(Exception):
             "message": self.message,
         }
         if self.details:
-            result["details"] = [detail.to_dict() for detail in self.details]
+            result["details"] = [
+                MessageToJson(detail) if isinstance(detail, ProtoAny) else detail.to_dict()
+                for detail in self.details
+            ]
         return result
 
     @classmethod

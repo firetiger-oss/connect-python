@@ -20,6 +20,7 @@ from .errors import ConnectError
 from .headers import HeaderInput
 from .headers import merge_headers
 from .headers import multidict_to_urllib3
+from .io import StreamReader
 from .streams import AsyncStreamOutput
 from .streams import StreamOutput
 from .streams_connect import EndStreamResponse
@@ -294,7 +295,7 @@ class ConnectStreamOutput(StreamOutput[T]):
     """
 
     # Size of a read during streaming
-    READ_CHUNK_SIZE = 65535
+    READ_CHUNK_SIZE = 8192
 
     def __init__(
         self,
@@ -302,7 +303,7 @@ class ConnectStreamOutput(StreamOutput[T]):
         response_type: type[T],
         serde: ConnectSerialization,
     ):
-        self._response = response
+        self._reader = StreamReader(response, None)
         self._response_type = response_type
         self._serde = serde
 
@@ -312,6 +313,9 @@ class ConnectStreamOutput(StreamOutput[T]):
         self._response_trailers: CIMultiDict[str] = CIMultiDict()
         self._error: ConnectError | None = None
 
+        # We only hold onto response in order to call release_conn
+        # when done.
+        self._response = response
         self._consumed = False
         self._released = False
 
@@ -321,39 +325,16 @@ class ConnectStreamOutput(StreamOutput[T]):
         self._error = ConnectError(ConnectErrorCode.INTERNAL, str(err))
         self.close()
 
-    def _readexactly(self, n: int) -> bytearray:
-        while len(self._buffer) < n:
-            if not self._fill_buffer():
-                raise EOFError
-
-        chunk = self._buffer[:n]
-        del self._buffer[:n]
-        return chunk
-
-    def _fill_buffer(self) -> bool:
-        """
-        Try to read from the response. Return False if the response has hit EOF
-        """
-        read_chunk = self._response.read(self.READ_CHUNK_SIZE)
-        if not len(read_chunk):
-            return False
-        self._buffer.extend(read_chunk)
-        return True
-
-    def _readall(self) -> bytearray:
-        self._buffer.extend(self._response.read())
-        return self._buffer
-
     def __next__(self) -> T:
         if self._consumed or self._released:
             raise StopIteration
-        envelope = self._readexactly(5)
+        envelope = self._reader.readexactly(5)
         if envelope[0] & 1:
             # message is compressed, which we dont currently handle
             raise NotImplementedError("cant handle compressed messages yet")
         if envelope[0] & 2:
             # This is an EndStreamResponse
-            encoded = self._readall()
+            encoded = self._reader.readall()
             end_stream_response = EndStreamResponse.from_bytes(encoded)
 
             if end_stream_response.error is not None:
@@ -366,7 +347,7 @@ class ConnectStreamOutput(StreamOutput[T]):
             raise StopIteration
 
         length = struct.unpack(">I", envelope[1:5])[0]
-        encoded = self._readexactly(length)
+        encoded = self._reader.readexactly(length)
         return self._serde.deserialize(bytes(encoded), self._response_type)
 
     def __iter__(self) -> Iterator[T]:
