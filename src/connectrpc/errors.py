@@ -78,7 +78,7 @@ class ConnectErrorCode(Enum):
             self.UNAVAILABLE: "503 Service Unavailable",
             self.DATA_LOSS: "500 Internal Server Error",
             self.UNAUTHENTICATED: "401 Unauthorized",
-        }[self.value]
+        }[self]  # type:ignore[index]
 
 
 # HTTP status to Connect error code fallback mapping
