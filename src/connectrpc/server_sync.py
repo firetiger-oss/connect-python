@@ -95,8 +95,9 @@ class ClientStream(Generic[T]):
                 try:
                     envelope = req.body.readexactly(5)
                 except EOFError:
-                    raise StopIteration from None
+                    return
                 envelope_flags, msg_length = struct.unpack(">BI", envelope)
+                debug(f"reading message of length {msg_length}")
                 data: bytes | bytearray = req.body.readexactly(msg_length)
 
                 if envelope_flags & 1:
@@ -136,11 +137,11 @@ class ServerStream(Generic[T]):
                 break
 
             data = msg.SerializeToString()
-            envelope = struct.pack("<BI", (0, len(data)))
+            envelope = struct.pack("<BI", 0, len(data))
             yield envelope + data
 
         data = end_msg.to_json()
-        envelope = struct.pack("<BI", (0, len(data)))
+        envelope = struct.pack("<BI", 0, len(data))
         yield envelope + data
 
 
