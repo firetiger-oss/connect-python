@@ -1,8 +1,6 @@
 import asyncio
-import struct
 import sys
 import time
-import traceback
 from collections.abc import AsyncGenerator
 from collections.abc import Generator
 from typing import Any
@@ -13,29 +11,26 @@ import aiohttp
 import google.protobuf.descriptor_pb2  # noqa: F401
 import urllib3
 import urllib3.exceptions
-from google.protobuf.any_pb2 import Any as ProtoAny
 from multidict import MultiDict
 
-from connectrpc.client_connect import UnexpectedContentType
+from conformance import exception_to_proto
+from conformance import multidict_to_proto
+from conformance import read_size_delimited_message
+from conformance import write_size_delimited_message
 from connectrpc.client_protocol import ConnectProtocol
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatRequest
 from connectrpc.conformance.v1.client_compat_pb2 import ClientCompatResponse
 from connectrpc.conformance.v1.client_compat_pb2 import ClientResponseResult
-from connectrpc.conformance.v1.config_pb2 import Code
 from connectrpc.conformance.v1.config_pb2 import Codec
 from connectrpc.conformance.v1.config_pb2 import Protocol
 from connectrpc.conformance.v1.service_pb2 import BidiStreamRequest
 from connectrpc.conformance.v1.service_pb2 import ClientStreamRequest
-from connectrpc.conformance.v1.service_pb2 import Error
-from connectrpc.conformance.v1.service_pb2 import Header
 from connectrpc.conformance.v1.service_pb2 import ServerStreamRequest
 from connectrpc.conformance.v1.service_pb2 import UnaryRequest
 from connectrpc.conformance.v1.service_pb2 import UnimplementedRequest
 from connectrpc.conformance.v1.service_pb2_connect import AsyncConformanceServiceClient
 from connectrpc.conformance.v1.service_pb2_connect import ConformanceServiceClient
 from connectrpc.debugprint import debug
-from connectrpc.errors import ConnectError
-from connectrpc.errors import ConnectErrorCode
 from connectrpc.streams import AsyncStreamOutput
 from connectrpc.streams import StreamOutput
 from connectrpc.unary import UnaryOutput
@@ -364,88 +359,6 @@ def request_headers(req: ClientCompatRequest) -> MultiDict[str]:
         for value in h.value:  # Preserve ALL values, not just the first one
             headers.add(h.name, value)
     return headers
-
-
-def multidict_to_proto(headers: MultiDict[str]) -> list[Header]:
-    result = []
-    for k in headers:
-        result.append(Header(name=k, value=headers.getall(k)))
-    return result
-
-
-def exception_to_proto(error: Exception) -> Error:
-    if isinstance(error, TimeoutError):
-        error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
-    if isinstance(error, urllib3.exceptions.TimeoutError):
-        error = ConnectError(ConnectErrorCode.DEADLINE_EXCEEDED, str(error))
-
-    if isinstance(error, UnexpectedContentType):
-        if error.content_type_received.startswith("application"):
-            # Fairly silly, but the test suite treats this differently
-            error = ConnectError(ConnectErrorCode.INTERNAL, str(error))
-        else:
-            error = ConnectError(ConnectErrorCode.UNKNOWN, str(error))
-
-    if not isinstance(error, ConnectError):
-        tb = traceback.format_tb(error.__traceback__)
-        error = ConnectError(ConnectErrorCode.INTERNAL, str(tb))
-
-    details: list[ProtoAny] = []
-    if isinstance(error.details, list):
-        for d in error.details:
-            v = ProtoAny()
-            v.Pack(d.message())
-            details.append(v)
-
-    code = {
-        ConnectErrorCode.CANCELED: Code.CODE_CANCELED,
-        ConnectErrorCode.UNKNOWN: Code.CODE_UNKNOWN,
-        ConnectErrorCode.INVALID_ARGUMENT: Code.CODE_INVALID_ARGUMENT,
-        ConnectErrorCode.DEADLINE_EXCEEDED: Code.CODE_DEADLINE_EXCEEDED,
-        ConnectErrorCode.NOT_FOUND: Code.CODE_NOT_FOUND,
-        ConnectErrorCode.ALREADY_EXISTS: Code.CODE_ALREADY_EXISTS,
-        ConnectErrorCode.PERMISSION_DENIED: Code.CODE_PERMISSION_DENIED,
-        ConnectErrorCode.RESOURCE_EXHAUSTED: Code.CODE_RESOURCE_EXHAUSTED,
-        ConnectErrorCode.FAILED_PRECONDITION: Code.CODE_FAILED_PRECONDITION,
-        ConnectErrorCode.ABORTED: Code.CODE_ABORTED,
-        ConnectErrorCode.OUT_OF_RANGE: Code.CODE_OUT_OF_RANGE,
-        ConnectErrorCode.UNIMPLEMENTED: Code.CODE_UNIMPLEMENTED,
-        ConnectErrorCode.INTERNAL: Code.CODE_INTERNAL,
-        ConnectErrorCode.UNAVAILABLE: Code.CODE_UNAVAILABLE,
-        ConnectErrorCode.DATA_LOSS: Code.CODE_DATA_LOSS,
-        ConnectErrorCode.UNAUTHENTICATED: Code.CODE_UNAUTHENTICATED,
-    }[error.code]
-
-    return Error(code=code, message=error.message, details=details)
-
-
-def read_size_delimited_message() -> bytes | None:
-    """Read a size-delimited protobuf message from stdin."""
-    # Read 4-byte big-endian length prefix
-    length_bytes = sys.stdin.buffer.read(4)
-    if len(length_bytes) < 4:
-        return None  # EOF
-
-    # Unpack big-endian 32-bit integer
-    message_length = struct.unpack(">I", length_bytes)[0]
-
-    # Read the actual message
-    message_bytes = sys.stdin.buffer.read(message_length)
-    if len(message_bytes) < message_length:
-        raise ValueError("Incomplete message")
-
-    return message_bytes
-
-
-def write_size_delimited_message(message_bytes: bytes) -> None:
-    """Write a size-delimited protobuf message to stdout."""
-    # Write 4-byte big-endian length prefix
-    length = len(message_bytes)
-    sys.stdout.buffer.write(struct.pack(">I", length))
-
-    # Write the actual message
-    sys.stdout.buffer.write(message_bytes)
-    sys.stdout.buffer.flush()
 
 
 def main(mode: str) -> None:

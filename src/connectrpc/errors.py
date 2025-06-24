@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any
 from typing import Optional
 
+from google.protobuf.json_format import MessageToJson
 from google.protobuf.message import Message
 from google.protobuf.symbol_database import Default as DefaultSymbolDatabase
 from google.protobuf.symbol_database import SymbolDatabase
@@ -56,6 +57,29 @@ class ConnectErrorCode(Enum):
                 return code
         return None
 
+    def http_status_line(self) -> str:
+        """
+        Returns the HTTP/1.1 Status-Line for a response containing this error.
+        """
+        return {
+            self.CANCELED: "499 Client Closed Request",
+            self.UNKNOWN: "500 Internal Server Error",
+            self.INVALID_ARGUMENT: "400 Bad Request",
+            self.DEADLINE_EXCEEDED: "504 Gateway Timeout",
+            self.NOT_FOUND: "404 Not Found",
+            self.ALREADY_EXISTS: "409 Conflict",
+            self.PERMISSION_DENIED: "403 Forbidden",
+            self.RESOURCE_EXHAUSTED: "429 Too Many Requests",
+            self.FAILED_PRECONDITION: "400 Bad Request",
+            self.ABORTED: "409 Conflict",
+            self.OUT_OF_RANGE: "400 Bad Request",
+            self.UNIMPLEMENTED: "501 Not Implemented",
+            self.INTERNAL: "500 Internal Server Error",
+            self.UNAVAILABLE: "503 Service Unavailable",
+            self.DATA_LOSS: "500 Internal Server Error",
+            self.UNAUTHENTICATED: "401 Unauthorized",
+        }[self]  # type:ignore[index]
+
 
 # HTTP status to Connect error code fallback mapping
 # Used when no explicit Connect error code is provided
@@ -94,6 +118,24 @@ class ConnectErrorDetail:
             type=data["type"],
             value=data["value"],
             debug=data.get("debug"),
+        )
+
+    @classmethod
+    def from_message(cls, msg: Message, include_debug: bool = False) -> "ConnectErrorDetail":
+        val = msg.SerializeToString()
+        type_name = msg.DESCRIPTOR.full_name
+        encoded_val = base64.b64encode(val).decode("ascii").rstrip("=")
+
+        if include_debug:
+            debug_json_str = MessageToJson(msg)
+            debug_json_dict = json.loads(debug_json_str)
+        else:
+            debug_json_dict = None
+
+        return ConnectErrorDetail(
+            type=type_name,
+            value=encoded_val,
+            debug=debug_json_dict,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -163,10 +205,22 @@ class ConnectError(Exception):
         result: dict[str, Any] = {
             "code": self.code.code_name,
             "message": self.message,
+            "details": [d.to_dict() for d in self.details],
         }
-        if self.details:
-            result["details"] = [detail.to_dict() for detail in self.details]
         return result
+
+    def add_detail(self, msg: Message, include_debug: bool = False) -> None:
+        """
+        Add a protobuf message as structured additional information to describe the error.
+
+        Args:
+            msg: The structured message data to include.
+            include_debug: If true, also serialize the data to JSON and include
+                it under the "debug" key. This is verbose, but makes the error easier
+                for humans to inspect.
+        """
+        detail = ConnectErrorDetail.from_message(msg, include_debug=include_debug)
+        self.details.append(detail)
 
     @classmethod
     def from_json(cls, json_str: str, http_status: int | None = None) -> "ConnectError":
