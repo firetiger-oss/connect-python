@@ -18,6 +18,9 @@ class EndStreamResponse:
     error: ConnectError | None
     metadata: CIMultiDict[str]
 
+    def to_json(self) -> bytes:
+        raise NotImplementedError
+
     @classmethod
     def from_bytes(cls, data: bytes | bytearray) -> EndStreamResponse:
         data_dict = json.loads(data)

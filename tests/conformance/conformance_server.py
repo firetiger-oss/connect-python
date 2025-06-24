@@ -17,7 +17,6 @@ from conformance import multidict_to_proto
 from conformance import proto_to_exception
 from conformance import read_size_delimited_message
 from conformance import write_size_delimited_message
-from connectrpc.conformance.v1.config_pb2 import Code
 from connectrpc.conformance.v1.config_pb2 import TLSCreds
 from connectrpc.conformance.v1.server_compat_pb2 import ServerCompatRequest
 from connectrpc.conformance.v1.server_compat_pb2 import ServerCompatResponse
