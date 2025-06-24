@@ -104,8 +104,7 @@ class ClientStream(Generic[T]):
                     decompressor = req.compression.decompressor()
                     data = decompressor.decompress(bytes(data))
 
-                msg = msg_type()
-                msg.ParseFromString(bytes(data))
+                msg = req.serialization.deserialize(bytes(data), msg_type)
                 yield msg
 
         return ClientStream(message_iterator(), req.headers, req.timeout.timeout_ms)
@@ -129,15 +128,17 @@ class ServerStream(Generic[T]):
             trailers = CIMultiDict()
         self.trailers = trailers
 
-    def iterate_bytes(self) -> Iterator[bytes]:
+    def iterate_bytes(self, ser: ConnectSerialization) -> Iterator[bytes]:
         end_msg = EndStreamResponse(None, self.trailers)
         for msg in self.msgs:
             if isinstance(msg, ConnectError):
                 end_msg.error = msg
                 break
 
-            data = msg.SerializeToString()
+            data = ser.serialize(msg)
             envelope = struct.pack("<BI", 0, len(data))
+            debug("writing message of len ", len(data))
+            debug("writing data: ", envelope + data)
             yield envelope + data
 
         data = end_msg.to_json()
@@ -575,6 +576,7 @@ class ConnectWSGI:
         server_stream = self.bidi_streaming_rpcs[connect_req.path](client_stream)
 
         resp.set_status_line("200 OK")
-        resp.set_header("connect-content-encoding", "identity")
-        resp.set_body(server_stream.iterate_bytes())
+        resp.set_header("content-type", req.content_type)
+        resp.set_header("connect-content-encoding", connect_req.compression.label)
+        resp.set_body(server_stream.iterate_bytes(connect_req.serialization))
         return
