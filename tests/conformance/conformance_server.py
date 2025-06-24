@@ -120,7 +120,7 @@ class Conformance:
     def unimplemented(
         self, req: ClientRequest[UnimplementedRequest]
     ) -> ServerResponse[UnimplementedResponse]:
-        raise NotImplementedError
+        raise ConnectError(ConnectErrorCode.UNIMPLEMENTED, "not implemented")
 
     def idempotent_unary(
         self, req: ClientRequest[IdempotentUnaryRequest]
