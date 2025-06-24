@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import struct
 import sys
+import time
 from abc import abstractmethod
 from collections.abc import Callable
 from collections.abc import Iterable
@@ -97,7 +98,6 @@ class ClientStream(Generic[T]):
                 except EOFError:
                     return
                 envelope_flags, msg_length = struct.unpack(">BI", envelope)
-                debug(f"reading message of length {msg_length}")
                 data: bytes | bytearray = req.body.readexactly(msg_length)
 
                 if envelope_flags & 1:
@@ -128,21 +128,29 @@ class ServerStream(Generic[T]):
             trailers = CIMultiDict()
         self.trailers = trailers
 
-    def iterate_bytes(self, ser: ConnectSerialization) -> Iterator[bytes]:
+    def iterate_bytes(self, ser: ConnectSerialization, timeout: ConnectTimeout) -> Iterator[bytes]:
+        """Serialize the messages in self.msgs into a stream of
+        bytes, suitable for wire transport by the connect streaming
+        protocol.
+
+        The timeout is checked after each message is yielded. If
+        applications need to abort length operations in a generator
+        that produces messages, they should check 'timeout' directly
+        in the
+
+        """
         end_msg = EndStreamResponse(None, self.trailers)
         for msg in self.msgs:
             if isinstance(msg, ConnectError):
                 end_msg.error = msg
                 break
-
+            timeout.check()
             data = ser.serialize(msg)
-            envelope = struct.pack("<BI", 0, len(data))
-            debug("writing message of len ", len(data))
-            debug("writing data: ", envelope + data)
+            envelope = struct.pack(">BI", 0, len(data))
             yield envelope + data
 
         data = end_msg.to_json()
-        envelope = struct.pack("<BI", 0, len(data))
+        envelope = struct.pack(">BI", 2, len(data))
         yield envelope + data
 
 
@@ -356,11 +364,30 @@ class ConnectStreamingRequest(ConnectRequest):
 
 class ConnectTimeout:
     """
-    Tiny wrapper to help distinguish between unset and invalid connect timeouts.
+    Represents a client-requested timeout on the RPC operation.
     """
 
     def __init__(self, timeout_ms: int | None):
+        self.start = time.monotonic()
         self.timeout_ms = timeout_ms
+
+    def expired(self) -> bool:
+        """Returns True if the timeout has been exceeded"""
+        if self.timeout_ms is None:
+            return False
+        elapsed = time.monotonic() - self.start
+        return elapsed < self.timeout_ms / 1000.0
+
+    def check(self) -> None:
+        """
+        Check if the timeout has expired. If it has, raise a ConnectError.
+        """
+        if self.expired():
+            elapsed = time.monotonic() - self.start
+            raise ConnectError(
+                ConnectErrorCode.DEADLINE_EXCEEDED,
+                f"deadline of {self.timeout_ms}ms was exceeded ({elapsed}s elapsed)",
+            )
 
 
 class WSGIResponse:
@@ -407,7 +434,6 @@ class WSGIResponse:
         self.set_header("Content-Type", "application/json")
         self.set_header("Content-Encoding", "identity")
         self.set_header("Content-Length", str(len(body)))
-        debug(body)
         self.set_body([body])
 
     def send_headers(self) -> None:
@@ -576,7 +602,9 @@ class ConnectWSGI:
         server_stream = self.bidi_streaming_rpcs[connect_req.path](client_stream)
 
         resp.set_status_line("200 OK")
+        for k, v in server_stream.headers.items():
+            resp.add_header(k, v)
         resp.set_header("content-type", req.content_type)
         resp.set_header("connect-content-encoding", connect_req.compression.label)
-        resp.set_body(server_stream.iterate_bytes(connect_req.serialization))
+        resp.set_body(server_stream.iterate_bytes(connect_req.serialization, connect_req.timeout))
         return

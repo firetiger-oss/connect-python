@@ -19,11 +19,11 @@ class EndStreamResponse:
     metadata: CIMultiDict[str]
 
     def to_json(self) -> bytes:
-        md = {}
-        for k, v in self.metadata:
+        md: dict[str, list[str]] = {}
+        for k, v in self.metadata.items():
             if k not in md:
                 md[k] = []
-                md[k].append(v)
+            md[k].append(v)
 
         if self.error is None:
             if len(self.metadata) == 0:

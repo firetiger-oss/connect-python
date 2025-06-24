@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from google.protobuf.any_pb2 import Any as ProtoAny
-from gunicorn.app.base import BaseApplication  # type:ignore[import-untyped]
+from gunicorn.app.base import BaseApplication  # type:ignore[ import-untyped]
 from multidict import CIMultiDict
 
 from conformance import multidict_to_proto
@@ -104,7 +104,7 @@ class Conformance:
         response: ServerStream[BidiStreamResponse] = ServerStream(msgs=[])
 
         response_defn: StreamResponseDefinition | None = None
-        first_msg = False
+        first_msg = True
         for msg in req:
             msg_as_any = ProtoAny()
             msg_as_any.Pack(msg)
@@ -140,8 +140,8 @@ class Conformance:
                 output_msg = BidiStreamResponse(payload=ConformancePayload(data=resp_data))
                 if n_sent == 0:
                     output_msg.payload.request_info.CopyFrom(req_info)
-                yield output_msg
                 time.sleep(response_defn.response_delay_ms / 1000.0)
+                yield output_msg
                 n_sent += 1
 
             if response_defn.HasField("error"):
