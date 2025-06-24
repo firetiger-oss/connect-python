@@ -99,7 +99,7 @@ ignore_errors = true
 target-version = "py310"
 line-length = 100
 src = ["src", "tests"]
-exclude = ["tests/conformance/connectrpc"]
+exclude = ["tests/conformance/connectrpc", "examples/*_pb2.py", "examples/*_pb2.pyi", "examples/*_pb2_*.py"]
 
 [tool.ruff.lint]
 select = [
