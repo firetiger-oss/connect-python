@@ -4,7 +4,7 @@ from .connect_compression import Decompressor
 
 
 class Stream(Protocol):
-    def read(self, n: int) -> bytes: ...
+    def read(self, size: int = ..., /) -> bytes: ...
 
 
 class StreamReader:
