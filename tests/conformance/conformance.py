@@ -7,6 +7,7 @@ import google.protobuf.descriptor_pb2  # noqa: F401
 import urllib3
 import urllib3.exceptions
 from google.protobuf.any_pb2 import Any as ProtoAny
+from google.protobuf.symbol_database import Default as DefaultSymbolDatabase
 from multidict import MultiDict
 
 from connectrpc.client_connect import UnexpectedContentType
@@ -15,6 +16,34 @@ from connectrpc.conformance.v1.service_pb2 import Error
 from connectrpc.conformance.v1.service_pb2 import Header
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
+
+
+def proto_to_exception(proto_error: Error) -> ConnectError:
+    code = {
+        Code.CODE_CANCELED: ConnectErrorCode.CANCELED,
+        Code.CODE_UNKNOWN: ConnectErrorCode.UNKNOWN,
+        Code.CODE_INVALID_ARGUMENT: ConnectErrorCode.INVALID_ARGUMENT,
+        Code.CODE_DEADLINE_EXCEEDED: ConnectErrorCode.DEADLINE_EXCEEDED,
+        Code.CODE_NOT_FOUND: ConnectErrorCode.NOT_FOUND,
+        Code.CODE_ALREADY_EXISTS: ConnectErrorCode.ALREADY_EXISTS,
+        Code.CODE_PERMISSION_DENIED: ConnectErrorCode.PERMISSION_DENIED,
+        Code.CODE_RESOURCE_EXHAUSTED: ConnectErrorCode.RESOURCE_EXHAUSTED,
+        Code.CODE_FAILED_PRECONDITION: ConnectErrorCode.FAILED_PRECONDITION,
+        Code.CODE_ABORTED: ConnectErrorCode.ABORTED,
+        Code.CODE_OUT_OF_RANGE: ConnectErrorCode.OUT_OF_RANGE,
+        Code.CODE_UNIMPLEMENTED: ConnectErrorCode.UNIMPLEMENTED,
+        Code.CODE_INTERNAL: ConnectErrorCode.INTERNAL,
+        Code.CODE_UNAVAILABLE: ConnectErrorCode.UNAVAILABLE,
+        Code.CODE_DATA_LOSS: ConnectErrorCode.DATA_LOSS,
+        Code.CODE_UNAUTHENTICATED: ConnectErrorCode.UNAUTHENTICATED,
+    }[proto_error.code]
+    connect_err = ConnectError(code, proto_error.message)
+    for d in proto_error.details:
+        d_type = DefaultSymbolDatabase().GetSymbol(d.type_url)
+        d_value = d_type()
+        d.Unpack(d_value)
+        connect_err.add_detail(d_value)
+    return connect_err
 
 
 def exception_to_proto(error: Exception) -> Error:

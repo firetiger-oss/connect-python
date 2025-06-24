@@ -6,6 +6,7 @@ import ssl
 import sys
 import tempfile
 import time
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from google.protobuf.any_pb2 import Any as ProtoAny
@@ -13,6 +14,7 @@ from gunicorn.app.base import BaseApplication  # type:ignore[import-untyped]
 from multidict import CIMultiDict
 
 from conformance import multidict_to_proto
+from conformance import proto_to_exception
 from conformance import read_size_delimited_message
 from conformance import write_size_delimited_message
 from connectrpc.conformance.v1.config_pb2 import Code
@@ -28,6 +30,7 @@ from connectrpc.conformance.v1.service_pb2 import IdempotentUnaryRequest
 from connectrpc.conformance.v1.service_pb2 import IdempotentUnaryResponse
 from connectrpc.conformance.v1.service_pb2 import ServerStreamRequest
 from connectrpc.conformance.v1.service_pb2 import ServerStreamResponse
+from connectrpc.conformance.v1.service_pb2 import StreamResponseDefinition
 from connectrpc.conformance.v1.service_pb2 import UnaryRequest
 from connectrpc.conformance.v1.service_pb2 import UnaryResponse
 from connectrpc.conformance.v1.service_pb2 import UnimplementedRequest
@@ -73,25 +76,7 @@ class Conformance:
         if delay > 0:
             time.sleep(delay / 1000.0)
         if req.msg.response_definition.HasField("error"):
-            code = {
-                Code.CODE_CANCELED: ConnectErrorCode.CANCELED,
-                Code.CODE_UNKNOWN: ConnectErrorCode.UNKNOWN,
-                Code.CODE_INVALID_ARGUMENT: ConnectErrorCode.INVALID_ARGUMENT,
-                Code.CODE_DEADLINE_EXCEEDED: ConnectErrorCode.DEADLINE_EXCEEDED,
-                Code.CODE_NOT_FOUND: ConnectErrorCode.NOT_FOUND,
-                Code.CODE_ALREADY_EXISTS: ConnectErrorCode.ALREADY_EXISTS,
-                Code.CODE_PERMISSION_DENIED: ConnectErrorCode.PERMISSION_DENIED,
-                Code.CODE_RESOURCE_EXHAUSTED: ConnectErrorCode.RESOURCE_EXHAUSTED,
-                Code.CODE_FAILED_PRECONDITION: ConnectErrorCode.FAILED_PRECONDITION,
-                Code.CODE_ABORTED: ConnectErrorCode.ABORTED,
-                Code.CODE_OUT_OF_RANGE: ConnectErrorCode.OUT_OF_RANGE,
-                Code.CODE_UNIMPLEMENTED: ConnectErrorCode.UNIMPLEMENTED,
-                Code.CODE_INTERNAL: ConnectErrorCode.INTERNAL,
-                Code.CODE_UNAVAILABLE: ConnectErrorCode.UNAVAILABLE,
-                Code.CODE_DATA_LOSS: ConnectErrorCode.DATA_LOSS,
-                Code.CODE_UNAUTHENTICATED: ConnectErrorCode.UNAUTHENTICATED,
-            }[req.msg.response_definition.error.code]
-            err = ConnectError(code, req.msg.response_definition.error.message)
+            err = proto_to_exception(req.msg.response_definition.error)
             err.add_detail(req_info, include_debug=True)
             return ServerResponse(err, headers, trailers)
 
@@ -115,7 +100,63 @@ class Conformance:
         raise NotImplementedError
 
     def bidi_stream(self, req: ClientStream[BidiStreamRequest]) -> ServerStream[BidiStreamResponse]:
-        raise NotImplementedError
+        received: list[ProtoAny] = []
+
+        response: ServerStream[BidiStreamResponse] = ServerStream(msgs=[])
+
+        response_defn: StreamResponseDefinition | None = None
+        first_msg = False
+        for msg in req:
+            msg_as_any = ProtoAny()
+            msg_as_any.Pack(msg)
+            received.append(msg_as_any)
+
+            if first_msg:
+                first_msg = False
+                if msg.full_duplex:
+                    raise ConnectError(
+                        ConnectErrorCode.UNIMPLEMENTED, "this server is half duplex only"
+                    )
+                if msg.HasField("response_definition"):
+                    response_defn = msg.response_definition
+                    for h in response_defn.response_headers:
+                        for value in h.value:
+                            response.headers.add(h.name, value)
+                    for t in response_defn.response_trailers:
+                        for value in t.value:
+                            response.trailers.add(t.name, value)
+
+        req_info = ConformancePayload.RequestInfo(
+            request_headers=multidict_to_proto(req.headers),
+            timeout_ms=req.timeout_ms,
+            requests=received,
+        )
+
+        def message_iterator() -> Iterable[BidiStreamResponse | ConnectError]:
+            if response_defn is None:
+                return
+
+            n_sent = 0
+            for resp_data in response_defn.response_data:
+                output_msg = BidiStreamResponse(payload=ConformancePayload(data=resp_data))
+                if n_sent == 0:
+                    output_msg.payload.request_info.CopyFrom(req_info)
+                yield output_msg
+                time.sleep(response_defn.response_delay_ms / 1000.0)
+                n_sent += 1
+
+            if response_defn.HasField("error"):
+                err_proto = response_defn.error
+                err = proto_to_exception(err_proto)
+                if n_sent == 0:
+                    # If we sent no responses, but are supposed to
+                    # send an error, then we need to stuff req_info
+                    # into the error details of the error.
+                    err.add_detail(req_info)
+                yield err
+
+        response.msgs = message_iterator()
+        return response
 
     def unimplemented(
         self, req: ClientRequest[UnimplementedRequest]

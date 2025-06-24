@@ -73,16 +73,38 @@ class ServerResponse(Generic[T]):
 
 
 class ClientStream(Generic[T]):
-    def __init__(self, msgs: Iterable[T], headers: CIMultiDict[str], trailers: CIMultiDict[str]):
+    def __init__(
+        self,
+        msgs: Iterable[T],
+        headers: CIMultiDict[str],
+        trailers: CIMultiDict[str],
+        timeout_ms: int | None,
+    ):
         self.msgs = msgs
         self.headers = headers
         self.trailers = trailers
+        self.timeout_ms = timeout_ms
+
+    def __next__(self) -> T:
+        raise NotImplementedError
+
+    def __iter__(self) -> ClientStream[T]:
+        return self
 
 
 class ServerStream(Generic[T]):
-    def __init__(self, msgs: Iterable[T], headers: CIMultiDict[str], trailers: CIMultiDict[str]):
+    def __init__(
+        self,
+        msgs: Iterable[T | ConnectError],
+        headers: CIMultiDict[str] | None = None,
+        trailers: CIMultiDict[str] | None = None,
+    ):
         self.msgs = msgs
+        if headers is None:
+            headers = CIMultiDict()
         self.headers = headers
+        if trailers is None:
+            trailers = CIMultiDict()
         self.trailers = trailers
 
 
