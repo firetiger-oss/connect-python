@@ -92,7 +92,49 @@ class Conformance:
     def server_stream(
         self, req: ClientRequest[ServerStreamRequest]
     ) -> ServerStream[ServerStreamResponse]:
-        raise NotImplementedError
+        # Capture the request
+        req_msg_any = ProtoAny()
+        req_msg_any.Pack(req.msg)
+        req_info = ConformancePayload.RequestInfo(
+            request_headers=multidict_to_proto(req.headers),
+            timeout_ms=req.timeout.timeout_ms,
+            requests=[req_msg_any],
+        )
+
+        response: ServerStream[ServerStreamResponse] = ServerStream(msgs=[])
+
+        response_defn = req.msg.response_definition
+        for h in response_defn.response_headers:
+            for value in h.value:
+                response.headers.add(h.name, value)
+        for t in response_defn.response_trailers:
+            for value in t.value:
+                response.trailers.add(t.name, value)
+
+        def message_iterator() -> Iterable[ServerStreamResponse | ConnectError]:
+            n_sent = 0
+            for resp_data in response_defn.response_data:
+                output_msg = ServerStreamResponse(payload=ConformancePayload(data=resp_data))
+                if n_sent == 0:
+                    output_msg.payload.request_info.CopyFrom(req_info)
+
+                time.sleep(response_defn.response_delay_ms / 1000.0)
+
+                yield output_msg
+                n_sent += 1
+
+            if response_defn.HasField("error"):
+                err_proto = response_defn.error
+                err = proto_to_exception(err_proto)
+                if n_sent == 0:
+                    # If we sent no responses, but are supposed to
+                    # send an error, then we need to stuff req_info
+                    # into the error details of the error.
+                    err.add_detail(req_info)
+                yield err
+
+        response.msgs = message_iterator()
+        return response
 
     def client_stream(
         self, req: ClientStream[ClientStreamRequest]

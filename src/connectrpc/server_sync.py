@@ -215,7 +215,7 @@ class ConnectWSGI:
             last_msg = msg
             if i > 1:
                 raise ConnectError(
-                    ConnectErrorCode.INVALID_ARGUMENT,
+                    ConnectErrorCode.UNIMPLEMENTED,
                     "server-streaming endpoint received more than one message from client",
                 )
 
