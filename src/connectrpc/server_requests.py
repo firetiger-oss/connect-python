@@ -14,7 +14,6 @@ from .connect_compression import supported_compressions
 from .connect_serialization import CONNECT_JSON_SERIALIZATION
 from .connect_serialization import CONNECT_PROTOBUF_SERIALIZATION
 from .connect_serialization import ConnectSerialization
-from .debugprint import debug
 from .errors import BareHTTPError
 from .errors import ConnectError
 from .errors import ConnectErrorCode

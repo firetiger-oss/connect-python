@@ -13,6 +13,7 @@ from connectrpc.streams_connect import EndStreamResponse
 
 from .connect_serialization import ConnectSerialization
 from .errors import ConnectError
+from .errors import ConnectErrorCode
 from .server_requests import ConnectStreamingRequest
 from .timeouts import ConnectTimeout
 
@@ -87,8 +88,18 @@ class ClientStream(Generic[T]):
                 data: bytes | bytearray = req.body.readexactly(msg_length)
 
                 if envelope_flags & 1:
+                    # Message is compressed - check if compression is expected
+                    if req.compression.label == "identity":
+                        raise ConnectError(
+                            ConnectErrorCode.INTERNAL,
+                            "received compressed message but no compression was specified in headers",
+                        )
                     decompressor = req.compression.decompressor()
                     data = decompressor.decompress(bytes(data))
+                elif req.compression.label != "identity":
+                    # No compression flag but compression was specified - this might be OK
+                    # Some implementations send uncompressed messages even when compression is available
+                    pass
 
                 msg = req.serialization.deserialize(bytes(data), msg_type)
                 req.timeout.check()

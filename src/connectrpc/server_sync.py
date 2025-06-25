@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import struct
 import sys
 from collections.abc import Callable
 from collections.abc import Iterable
@@ -11,18 +12,18 @@ from typing import TypeVar
 from google.protobuf.message import Message
 from multidict import CIMultiDict
 
+from connectrpc.debugprint import debug
+from connectrpc.errors import ConnectError
+from connectrpc.errors import ConnectErrorCode
+from connectrpc.server import ClientRequest
+from connectrpc.server import ClientStream
+from connectrpc.server import ServerResponse
+from connectrpc.server import ServerStream
 from connectrpc.server_requests import ConnectStreamingRequest
 from connectrpc.server_requests import ConnectUnaryRequest
 from connectrpc.server_wsgi import WSGIRequest
 from connectrpc.server_wsgi import WSGIResponse
-
-from .debugprint import debug
-from .errors import ConnectError
-from .errors import ConnectErrorCode
-from .server import ClientRequest
-from .server import ClientStream
-from .server import ServerResponse
-from .server import ServerStream
+from connectrpc.streams_connect import EndStreamResponse
 
 if TYPE_CHECKING:
     # wsgiref.types was added in Python 3.11.
@@ -99,6 +100,25 @@ class ConnectWSGI:
                 result.add(header_key, v)
         return result
 
+    def _send_streaming_error(
+        self, error: ConnectError, req: WSGIRequest, resp: WSGIResponse
+    ) -> None:
+        """Send a streaming error using HTTP 200 + EndStreamResponse format."""
+
+        resp.set_status_line("200 OK")
+
+        # Determine content-type from request
+        if req.content_type.startswith("application/connect+"):
+            resp.set_header("content-type", req.content_type)
+        else:
+            resp.set_header("content-type", "application/connect+json")
+
+        # Send error as EndStreamResponse
+        end_stream_response = EndStreamResponse(error, CIMultiDict())
+        data = end_stream_response.to_json()
+        envelope = struct.pack(">BI", 2, len(data))  # Flag 2 = EndStreamResponse
+        resp.set_body([envelope + data])
+
     def __call__(self, environ: WSGIEnvironment, start_response: StartResponse) -> Iterable[bytes]:
         req = WSGIRequest(environ)
         resp = WSGIResponse(start_response)
@@ -131,15 +151,34 @@ class ConnectWSGI:
             return resp.send()
 
         except ConnectError as err:
-            resp.set_from_error(err)
+            # Format error according to RPC type
+            if rpc_type in (
+                RPCType.CLIENT_STREAMING,
+                RPCType.SERVER_STREAMING,
+                RPCType.BIDI_STREAMING,
+            ):
+                # Streaming error: HTTP 200 + EndStreamResponse
+                self._send_streaming_error(err, req, resp)
+            else:
+                # Unary error: HTTP status + JSON body
+                resp.set_from_error(err)
             return resp.send()
         except Exception as err:
-            err = ConnectError(ConnectErrorCode.INTERNAL, str(err))
             import traceback
 
             debug("got exception: ", traceback.format_exc())
-            err = ConnectError(ConnectErrorCode.INTERNAL, str(err))
-            resp.set_from_error(err)
+            connect_err = ConnectError(ConnectErrorCode.INTERNAL, str(err))
+            # Format error according to RPC type
+            if rpc_type in (
+                RPCType.CLIENT_STREAMING,
+                RPCType.SERVER_STREAMING,
+                RPCType.BIDI_STREAMING,
+            ):
+                # Streaming error: HTTP 200 + EndStreamResponse
+                self._send_streaming_error(connect_err, req, resp)
+            else:
+                # Unary error: HTTP status + JSON body
+                resp.set_from_error(connect_err)
             return resp.send()
 
     def call_unary(self, req: WSGIRequest, resp: WSGIResponse) -> None:
@@ -213,7 +252,7 @@ class ConnectWSGI:
         last_msg: Message | None = None
         for i, msg in enumerate(client_stream):
             last_msg = msg
-            if i > 1:
+            if i >= 1:
                 raise ConnectError(
                     ConnectErrorCode.UNIMPLEMENTED,
                     "server-streaming endpoint received more than one message from client",
@@ -221,8 +260,8 @@ class ConnectWSGI:
 
         if last_msg is None:
             raise ConnectError(
-                ConnectErrorCode.INVALID_ARGUMENT,
-                "server-streaming endpoint received more no message from client",
+                ConnectErrorCode.UNIMPLEMENTED,
+                "server-streaming endpoint received no message from client",
             )
 
         client_request = ClientRequest(
