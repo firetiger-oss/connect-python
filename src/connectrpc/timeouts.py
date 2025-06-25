@@ -29,7 +29,7 @@ class ConnectTimeout:
         if self.timeout_ms is None:
             return False
         elapsed = time.monotonic() - self.start
-        return elapsed < self.timeout_ms / 1000.0
+        return elapsed > self.timeout_ms / 1000.0
 
     def check(self) -> None:
         """
@@ -39,5 +39,5 @@ class ConnectTimeout:
             elapsed = time.monotonic() - self.start
             raise ConnectError(
                 ConnectErrorCode.DEADLINE_EXCEEDED,
-                f"deadline of {self.timeout_ms}ms was exceeded ({elapsed}s elapsed)",
+                f"deadline of {self.timeout_ms}ms was exceeded ({int(elapsed * 1000)}ms elapsed)",
             )
