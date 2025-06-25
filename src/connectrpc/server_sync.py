@@ -113,7 +113,7 @@ class ConnectWSGI:
         # Now route the message.
         rpc_type = self.rpc_types.get(req.path)
         if rpc_type is None:
-            err = ConnectError(ConnectErrorCode.NOT_FOUND, "no such rpc available")
+            err = ConnectError(ConnectErrorCode.UNIMPLEMENTED, "no such rpc available")
             resp.set_from_error(err)
             return resp.send()
 

@@ -15,6 +15,7 @@ from google.protobuf.json_format import MessageToJson
 from google.protobuf.message import Message
 from google.protobuf.symbol_database import Default as DefaultSymbolDatabase
 from google.protobuf.symbol_database import SymbolDatabase
+from multidict import CIMultiDict
 
 
 class ConnectErrorCode(Enum):
@@ -165,6 +166,28 @@ class ConnectErrorDetail:
         msg_val.ParseFromString(data)
 
         return msg_val
+
+
+class BareHTTPError(Exception):
+    """Represents an HTTP-level error response.
+
+    Used for errors that should be sent as raw HTTP responses with non-200 status
+    codes, such as 415 Unsupported Media Type. These bypass Connect protocol
+    error formatting.
+    """
+
+    def __init__(self, status_line: str, headers: CIMultiDict[str], body: bytes):
+        """Initialize a BareHTTPError.
+
+        Args:
+            status_line: HTTP status line (e.g., "415 Unsupported Media Type")
+            headers: HTTP headers to include in response
+            body: Response body content
+        """
+        super().__init__(f"HTTP error: {status_line}")
+        self.status_line = status_line
+        self.headers = headers
+        self.body = body
 
 
 class ConnectError(Exception):
