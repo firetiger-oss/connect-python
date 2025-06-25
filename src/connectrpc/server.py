@@ -27,18 +27,18 @@ class ClientRequest(Generic[T]):
     """
 
     def __init__(
-        self, msg: T, headers: CIMultiDict[str], trailers: CIMultiDict[str], timeout_ms: int | None
+        self, msg: T, headers: CIMultiDict[str], trailers: CIMultiDict[str], timeout: ConnectTimeout
     ):
         self.msg = msg
         self.headers = headers
         self.trailers = trailers
-        self.timeout_ms = timeout_ms
+        self.timeout = timeout
 
 
 class ServerResponse(Generic[T]):
     def __init__(
         self,
-        payload: T | ConnectError,
+        payload: T | ConnectError | None,
         headers: CIMultiDict[str] | None = None,
         trailers: CIMultiDict[str] | None = None,
     ):
@@ -57,6 +57,10 @@ class ServerResponse(Generic[T]):
             trailers = CIMultiDict()
         self.trailers = trailers
 
+    @classmethod
+    def empty(cls) -> ServerResponse[T]:
+        return ServerResponse(None)
+
     def payload(self) -> T | ConnectError:
         if self.msg is not None:
             return self.msg
@@ -66,15 +70,10 @@ class ServerResponse(Generic[T]):
 
 
 class ClientStream(Generic[T]):
-    def __init__(
-        self,
-        msgs: Iterator[T],
-        headers: CIMultiDict[str],
-        timeout_ms: int | None,
-    ):
+    def __init__(self, msgs: Iterator[T], headers: CIMultiDict[str], timeout: ConnectTimeout):
         self.msgs = msgs
         self.headers = headers
-        self.timeout_ms = timeout_ms
+        self.timeout = timeout
 
     @classmethod
     def from_client_req(cls, req: ConnectStreamingRequest, msg_type: type[T]) -> ClientStream[T]:
@@ -92,9 +91,10 @@ class ClientStream(Generic[T]):
                     data = decompressor.decompress(bytes(data))
 
                 msg = req.serialization.deserialize(bytes(data), msg_type)
+                req.timeout.check()
                 yield msg
 
-        return ClientStream(message_iterator(), req.headers, req.timeout.timeout_ms)
+        return ClientStream(message_iterator(), req.headers, req.timeout)
 
     def __iter__(self) -> Iterator[T]:
         return self.msgs
@@ -130,7 +130,6 @@ class ServerStream(Generic[T]):
             if isinstance(msg, ConnectError):
                 end_msg.error = msg
                 break
-            timeout.check()
             data = ser.serialize(msg)
             envelope = struct.pack(">BI", 0, len(data))
             yield envelope + data

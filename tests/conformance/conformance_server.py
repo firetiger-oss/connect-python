@@ -32,15 +32,16 @@ from connectrpc.conformance.v1.service_pb2 import ServerStreamResponse
 from connectrpc.conformance.v1.service_pb2 import StreamResponseDefinition
 from connectrpc.conformance.v1.service_pb2 import UnaryRequest
 from connectrpc.conformance.v1.service_pb2 import UnaryResponse
+from connectrpc.conformance.v1.service_pb2 import UnaryResponseDefinition
 from connectrpc.conformance.v1.service_pb2 import UnimplementedRequest
 from connectrpc.conformance.v1.service_pb2 import UnimplementedResponse
 from connectrpc.conformance.v1.service_pb2_connect import wsgi_conformance_service
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
-from connectrpc.server_sync import ClientRequest
-from connectrpc.server_sync import ClientStream
-from connectrpc.server_sync import ServerResponse
-from connectrpc.server_sync import ServerStream
+from connectrpc.server import ClientRequest
+from connectrpc.server import ClientStream
+from connectrpc.server import ServerResponse
+from connectrpc.server import ServerStream
 
 if TYPE_CHECKING:
     # wsgiref.types was added in Python 3.11.
@@ -57,7 +58,7 @@ class Conformance:
 
         req_info = ConformancePayload.RequestInfo(
             request_headers=multidict_to_proto(req.headers),
-            timeout_ms=req.timeout_ms,
+            timeout_ms=req.timeout.timeout_ms,
             requests=[req_msg_any],
         )
 
@@ -96,7 +97,52 @@ class Conformance:
     def client_stream(
         self, req: ClientStream[ClientStreamRequest]
     ) -> ServerResponse[ClientStreamResponse]:
-        raise NotImplementedError
+        received: list[ProtoAny] = []
+
+        response: ServerResponse[ClientStreamResponse] = ServerResponse.empty()
+
+        response_defn: UnaryResponseDefinition | None = None
+        first_msg = True
+        for msg in req:
+            msg_as_any = ProtoAny()
+            msg_as_any.Pack(msg)
+            received.append(msg_as_any)
+
+            if first_msg:
+                first_msg = False
+                if msg.response_definition is not None:
+                    response_defn = msg.response_definition
+                    for h in response_defn.response_headers:
+                        for value in h.value:
+                            response.headers.add(h.name, value)
+                    for t in response_defn.response_trailers:
+                        for value in t.value:
+                            response.trailers.add(t.name, value)
+
+        req_info = ConformancePayload.RequestInfo(
+            request_headers=multidict_to_proto(req.headers),
+            timeout_ms=req.timeout.timeout_ms,
+            requests=received,
+        )
+        assert response_defn is not None
+
+        if response_defn.response_delay_ms > 0:
+            time.sleep(response_defn.response_delay_ms / 1000.0)
+        if response_defn.HasField("error"):
+            assert response_defn.error is not None
+            err_proto = response_defn.error
+            err = proto_to_exception(err_proto)
+            err.add_detail(req_info)
+            response.error = err
+            return response
+
+        response.msg = ClientStreamResponse(
+            payload=ConformancePayload(
+                request_info=req_info,
+                data=response_defn.response_data,
+            ),
+        )
+        return response
 
     def bidi_stream(self, req: ClientStream[BidiStreamRequest]) -> ServerStream[BidiStreamResponse]:
         received: list[ProtoAny] = []
@@ -127,7 +173,7 @@ class Conformance:
 
         req_info = ConformancePayload.RequestInfo(
             request_headers=multidict_to_proto(req.headers),
-            timeout_ms=req.timeout_ms,
+            timeout_ms=req.timeout.timeout_ms,
             requests=received,
         )
 

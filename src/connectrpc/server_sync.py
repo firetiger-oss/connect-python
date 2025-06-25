@@ -158,9 +158,7 @@ class ConnectWSGI:
             if k.startswith("trailer-"):
                 trailers.add(k, v)
 
-        client_req = ClientRequest(
-            msg, connect_req.headers, trailers, connect_req.timeout.timeout_ms
-        )
+        client_req = ClientRequest(msg, connect_req.headers, trailers, connect_req.timeout)
 
         server_resp = self.unary_rpcs[connect_req.path](client_req)
 
@@ -228,9 +226,11 @@ class ConnectWSGI:
             )
 
         client_request = ClientRequest(
-            last_msg, client_stream.headers, CIMultiDict(), client_stream.timeout_ms
+            last_msg, client_stream.headers, CIMultiDict(), client_stream.timeout
         )
         server_stream = self.server_streaming_rpcs[connect_req.path](client_request)
+
+        connect_req.timeout.check()
 
         resp.set_status_line("200 OK")
         for k, v in server_stream.headers.items():
