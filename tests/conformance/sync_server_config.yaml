@@ -9,6 +9,8 @@ features:
   compressions:
     - COMPRESSION_IDENTITY
     - COMPRESSION_GZIP
+    - COMPRESSION_BR
+    - COMPRESSION_ZSTD
   stream_types:
     - STREAM_TYPE_UNARY
     - STREAM_TYPE_CLIENT_STREAM
@@ -21,4 +23,3 @@ features:
   supports_trailers: false
   supports_connect_get: false
   supports_message_receive_limit: false
-  

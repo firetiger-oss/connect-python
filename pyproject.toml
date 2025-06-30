@@ -31,8 +31,10 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "aiohttp>=3.1", # 3.1 adds AsyncIterablePayload, which we need
+    "brotli[dev]>=1.1.0",
     "multidict",
     "protobuf",
+    "pyzstd[dev]>=0.17.0",
     "urllib3>=2.5.0",
 ]
 

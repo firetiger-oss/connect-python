@@ -72,6 +72,74 @@ GzipCodec = CompressionCodec("gzip", GzipCompressor, GzipDecompressor)
 SUPPORTED_COMPRESSIONS = {"identity": IdentityCodec, "gzip": GzipCodec}
 
 
+try:
+    import brotli
+
+    class BrotliCompressor:
+        def compress(self, data: bytes) -> bytes:
+            return brotli.compress(data)
+
+        def flush(self) -> bytes:
+            return b""
+
+    class BrotliDecompressor:
+        def decompress(self, data: bytes) -> bytes:
+            return brotli.decompress(data)
+
+    BrotliCodec = CompressionCodec("br", BrotliCompressor, BrotliDecompressor)
+    SUPPORTED_COMPRESSIONS["br"] = BrotliCodec
+
+except ImportError:
+    pass
+
+# Lots of ways zstd might be available...
+try:
+    # Python 3.14 makes zstd available in the standard library
+    from compression import zstd
+
+    class ZstdCompressor:
+        def __init__(self):
+            self.compressor = zstd.ZstdCompressor()
+
+        def compress(self, data: bytes) -> bytes:
+            return self.compressor.compress(data)
+
+        def flush(self) -> bytes:
+            return self.compressor.flush()
+
+    class ZstdDecompressor:
+        def decompress(self, data: bytes) -> bytes:
+            return zstd.decompress(data)
+
+    ZstdCodec = CompressionCodec("zstd", ZstdCompressor, ZstdDecompressor)
+    SUPPORTED_COMPRESSIONS["zstd"] = ZstdCodec
+
+except ImportError:
+    # Fallback to pyzstd if its available
+    try:
+        import pyzstd
+
+        class ZstdCompressor:
+            def __init__(self):
+                self.compressor = pyzstd.ZstdCompressor()
+
+            def compress(self, data: bytes) -> bytes:
+                return self.compressor.compress(data)
+
+            def flush(self) -> bytes:
+                return self.compressor.flush()
+
+        class ZstdDecompressor:
+            def decompress(self, data: bytes) -> bytes:
+                return pyzstd.decompress(data)
+
+        ZstdCodec = CompressionCodec("zstd", ZstdCompressor, ZstdDecompressor)
+        SUPPORTED_COMPRESSIONS["zstd"] = ZstdCodec
+
+    except ImportError:
+        pass
+
+
 def load_compression(id: str) -> CompressionCodec:
     codec = SUPPORTED_COMPRESSIONS.get(id)
     if codec is None:
