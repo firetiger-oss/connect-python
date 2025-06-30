@@ -111,5 +111,17 @@ clean:
     uv sync --group dev --all-extras
     echo "Clean complete!"
 
+# Build documentation
+docs:
+    cd docs && uv run sphinx-build -b html . _build/html
+
+# Serve documentation locally
+docs-serve: docs
+    cd docs/_build/html && python -m http.server 8000
+
+# Clean documentation build
+docs-clean:
+    rm -rf docs/_build
+
 # Run all checks (format, check, mypy, test, integration-test)
 all: format check mypy test integration-test

@@ -48,6 +48,11 @@ dev = [
     "gunicorn>=23.0.0",
     "brotli>=1.1.0",
     "pyzstd>=0.17.0",
+    "sphinx>=7.0.0",
+    "myst-parser>=2.0.0",
+    "sphinx-rtd-theme>=2.0.0",
+    "sphinx-autodoc-typehints>=1.25.0",
+    "linkify-it-py>=2.0.0",
 ]
 
 [project.scripts]
