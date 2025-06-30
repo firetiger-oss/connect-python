@@ -40,7 +40,7 @@ IdentityCodec = CompressionCodec("identity", IdentityCompressor, IdentityDecompr
 
 class GzipDecompressor:
     def __init__(self) -> None:
-        self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
+        self.decompressor = zlib.decompressobj(wbits=zlib.MAX_WBITS | 16)
 
     def decompress(self, data: bytes) -> bytes:
         return self.decompressor.decompress(data)
