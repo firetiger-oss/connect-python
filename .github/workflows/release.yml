@@ -27,8 +27,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv sync --group dev
-        uv add --group dev --dev hatch-vcs
+        uv sync --group dev --all-extras
 
     - name: Run linting
       run: |
