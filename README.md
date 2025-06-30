@@ -103,6 +103,53 @@ for response in eliza_client.converse(requests):
 	print("    Eliza: {response.sentence}")
 ```
 
+### Servers
+
+This library also supports running Connect servers. Currently, only
+synchronous servers running as WSGI applications are supported, but
+ASGI-based servers are planned.
+
+The generated code includes a function that you can use to mount an
+object which implements your service as a WSGI application:
+
+```python
+def wsgi_eliza_service(implementation: ElizaServiceProtocol) -> WSGIApplication:
+    ...
+```
+
+That `ElizaServiceProtocol` is also defined in the generated code, and
+it describes the method set that your object needs to implement:
+
+```python
+@typing.runtime_checkable
+class ElizaServiceProtocol(typing.Protocol):
+    def say(self, req: ClientRequest[eliza_pb2.SayRequest]) -> ServerResponse[eliza_pb2.SayResponse]:
+        ...
+    def converse(self, req: ClientStream[eliza_pb2.ConverseRequest]) -> ServerStream[eliza_pb2.ConverseResponse]:
+        ...
+    def introduce(self, req: ClientRequest[eliza_pb2.IntroduceRequest]) -> ServerStream[eliza_pb2.IntroduceResponse]:
+        ...
+```
+
+That is, each RPC method becomes a method you need to implement. The
+input and output types have little wrappers:
+
+ - `ClientRequest` bundles the protobuf message (as
+   `ClientRequest.msg`) with request metadata (headers and trailers)
+   as well as any client-requested timeout.
+ - `ClientStream` provides headers and a timeout, and is an iterator -
+   you can do `for msg in stream` with a ClientStream. 
+ - `ServerResponse` gives a way to return header and trailer metadata
+   alongside the response message (or alongside a `ConnectError`
+   error).
+ - `ServerStream` gives a way to return header and trailer metadata
+   alongside an iterator of response messages. The iterator is also
+   allowed to yield a `ConnectError` at any point to interrupt
+   streaming and abort with the given error.
+   
+These docs are immature, and more is to come on them. I'd like to get
+a Read the Docs site up, this README is getting unwieldy.
+
 ### Advanced usage
 
 #### Sending extra headers
