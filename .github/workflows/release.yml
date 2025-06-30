@@ -11,9 +11,20 @@ permissions:
   id-token: write
 
 jobs:
+  check-ci:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Wait for CI to pass
+      uses: fountainhead/action-wait-for-check@v1.2.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        checkName: lint-and-typecheck
+        ref: main
+
   build-and-publish:
     runs-on: ubuntu-latest
     environment: pypi
+    needs: check-ci
     steps:
     - uses: actions/checkout@v4
       with:
@@ -26,13 +37,7 @@ jobs:
       run: uv python install 3.13.3
 
     - name: Install dependencies
-      run: |
-        uv sync --group dev --all-extras
-
-    - name: Run linting
-      run: |
-        uv run just check
-        uv run just mypy
+      run: uv sync --group dev --all-extras
 
     - name: Build package
       run: uv build
