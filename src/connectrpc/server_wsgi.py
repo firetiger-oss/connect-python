@@ -52,6 +52,14 @@ class WSGIResponse:
         self.status_line = "200 OK"
         self.headers: CIMultiDict[str] = CIMultiDict()
         self.body: Iterable[bytes] = []
+        self.compression: CompressionCodec = IdentityCodec
+
+    def set_compressor(self, c: CompressionCodec):
+        """
+        Sets a compression codec to be used compressing all bytes sent out
+        """
+        self.compression = c
+        self.set_header("content-encoding", c.label)
 
     def add_header(self, key: str, value: str) -> None:
         """

@@ -91,7 +91,7 @@ conformance-test-server-sync *ARGS:
     cd tests/conformance
 
     connectconformance \
-        --conf ./sync_config.yaml \
+        --conf ./sync_server_config.yaml \
         --mode server \
         {{ARGS}} \
         -- \
