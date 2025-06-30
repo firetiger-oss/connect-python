@@ -273,6 +273,8 @@ class SocketGunicornApp(BaseApplication):  # type:ignore[misc]
     def load_config(self) -> None:
         # Tell Gunicorn to use our pre-bound socket
         self.cfg.set("bind", f"fd://{self.sock.fileno()}")
+        self.cfg.set("preload_app", True)
+        self.cfg.set("workers", 8)
 
     def load(self) -> WSGIApplication:
         return self.app
