@@ -12,6 +12,7 @@ class Decompressor(Protocol):
 
 class Compressor(Protocol):
     def compress(self, data: bytes) -> bytes: ...
+    def flush(self) -> bytes: ...
 
 
 @dataclass
@@ -24,6 +25,9 @@ class CompressionCodec:
 class IdentityCompressor:
     def compress(self, data: bytes) -> bytes:
         return data
+
+    def flush(self) -> bytes:
+        return b""
 
 
 class IdentityDecompressor:
@@ -48,6 +52,9 @@ class GzipCompressor:
 
     def compress(self, data: bytes) -> bytes:
         return self.compressor.compress(data)
+
+    def flush(self) -> bytes:
+        return self.compressor.flush()
 
 
 GzipCodec = CompressionCodec("gzip", GzipCompressor, GzipDecompressor)
