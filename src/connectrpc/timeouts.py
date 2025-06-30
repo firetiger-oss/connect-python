@@ -24,6 +24,9 @@ class ConnectTimeout:
         self.start = time.monotonic()
         self.timeout_ms = timeout_ms
 
+    def __str__(self) -> str:
+        return f"ConnectTimeout(timeout_ms={self.timeout_ms})"
+
     def expired(self) -> bool:
         """Returns True if the timeout has been exceeded"""
         if self.timeout_ms is None:
