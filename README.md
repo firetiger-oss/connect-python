@@ -355,9 +355,7 @@ The `call` APIs do not generally raise errors. It's up to you to
 
 ## Current State
 
-This is an early implementation which only covers the client side.
-
-### Supported Features
+### Client Supported Features
 
 The client supports the Connect Protocol over HTTP 1.1, verified with
 the official conformance test suite.
@@ -373,14 +371,33 @@ for both synchronous and asynchronous clients.
 The client correctly handles response headers, trailers, and all error
 codes.
 
+### Server supported features
+
+The server supports the Connect Protocol over HTTP 1.1, verified with
+the official conformance test suite.
+
+Unary, client streaming, and server streaming RPCs are fully
+supported.
+
+Only half-duplex bidirectional streaming is supported. This means the
+client sends _all_ of its stream messages before yielding any of the
+server's responses. This is because we're on HTTP 1.1, and is the case
+for both synchronous and asynchronous clients.
+
+The server correctly handles compression and client-set timeouts. It
+provides client headers and allows setting response headers and
+trailers.
+
 ### Not yet supported (but definitely planned)
 
-- Compression
-- Conformance tests of TLS
+- Client Compression
+- Client Conformance tests of TLS
+- Async server built on ASGI
 
 ### Not yet supported (and maybe never will be?)
 
-- http/2 transport
+- http/2 client transport
+- gRPC server compatibility
 
 ## Installation
 
