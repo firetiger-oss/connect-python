@@ -97,5 +97,19 @@ conformance-test-server-sync *ARGS:
         -- \
     	uv run python conformance_server.py sync
 
+# Clean all cache files and rebuild environment
+clean:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Cleaning Python bytecode cache..."
+    find . -name "*.pyc" -delete
+    find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+    echo "Cleaning mypy cache..."
+    rm -rf .mypy_cache
+    echo "Recreating virtual environment..."
+    rm -rf .venv
+    uv sync --group dev --all-extras
+    echo "Clean complete!"
+
 # Run all checks (format, check, mypy, test, integration-test)
 all: format check mypy test integration-test

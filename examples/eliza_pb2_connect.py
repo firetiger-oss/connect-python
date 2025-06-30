@@ -14,11 +14,11 @@ from connectrpc.client_sync import ConnectClient
 from connectrpc.client_protocol import ConnectProtocol
 from connectrpc.client_connect import ConnectProtocolError
 from connectrpc.headers import HeaderInput
-from connectrpc.server_sync import ClientRequest
-from connectrpc.server_sync import ClientStream
+from connectrpc.server import ClientRequest
+from connectrpc.server import ClientStream
+from connectrpc.server import ServerResponse
+from connectrpc.server import ServerStream
 from connectrpc.server_sync import ConnectWSGI
-from connectrpc.server_sync import ServerResponse
-from connectrpc.server_sync import ServerStream
 from connectrpc.streams import StreamInput
 from connectrpc.streams import AsyncStreamOutput
 from connectrpc.streams import StreamOutput
