@@ -12,7 +12,6 @@ class Decompressor(Protocol):
 
 class Compressor(Protocol):
     def compress(self, data: bytes) -> bytes: ...
-    def flush(self) -> bytes: ...
 
 
 @dataclass
@@ -26,9 +25,6 @@ class IdentityCompressor:
     def compress(self, data: bytes) -> bytes:
         return data
 
-    def flush(self) -> bytes:
-        return b""
-
 
 class IdentityDecompressor:
     def decompress(self, data: bytes) -> bytes:
@@ -40,7 +36,7 @@ IdentityCodec = CompressionCodec("identity", IdentityCompressor, IdentityDecompr
 
 class GzipDecompressor:
     def __init__(self) -> None:
-        self.decompressor = zlib.decompressobj(wbits=zlib.MAX_WBITS | 16)
+        self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
 
     def decompress(self, data: bytes) -> bytes:
         return self.decompressor.decompress(data)
@@ -48,13 +44,10 @@ class GzipDecompressor:
 
 class GzipCompressor:
     def __init__(self) -> None:
-        self.compressor = zlib.compressobj(wbits=zlib.MAX_WBITS | 16)
+        self.compressor = zlib.compressobj(zlib.MAX_WBITS | 16)
 
     def compress(self, data: bytes) -> bytes:
         return self.compressor.compress(data)
-
-    def flush(self) -> bytes:
-        return self.compressor.flush()
 
 
 GzipCodec = CompressionCodec("gzip", GzipCompressor, GzipDecompressor)
