@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import zlib
 from collections.abc import Callable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -13,6 +14,15 @@ class Decompressor(Protocol):
 class Compressor(Protocol):
     def compress(self, data: bytes) -> bytes: ...
     def flush(self) -> bytes: ...
+
+
+def compress_stream(stream: Iterable[bytes], compressor: Compressor) -> Iterable[bytes]:
+    def compressed():
+        for b in stream:
+            yield compressor.compress(b)
+        yield compressor.flush()
+
+    return compressed()
 
 
 @dataclass
@@ -48,7 +58,7 @@ class GzipDecompressor:
 
 class GzipCompressor:
     def __init__(self) -> None:
-        self.compressor = zlib.compressobj(zlib.MAX_WBITS | 16)
+        self.compressor = zlib.compressobj(wbits=zlib.MAX_WBITS | 16)
 
     def compress(self, data: bytes) -> bytes:
         return self.compressor.compress(data)

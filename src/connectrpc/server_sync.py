@@ -12,6 +12,7 @@ from typing import TypeVar
 from google.protobuf.message import Message
 from multidict import CIMultiDict
 
+from connectrpc.connect_compression import compress_stream
 from connectrpc.debugprint import debug
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
@@ -209,10 +210,8 @@ class ConnectWSGI:
         if server_resp.msg is not None:
             encoded = connect_req.serialization.serialize(server_resp.msg)
             resp.set_header("content-type", connect_req.serialization.unary_content_type)
-            encoded = connect_req.compression.compressor().compress(encoded)
             resp.set_header("content-encoding", connect_req.compression.label)
-            resp.set_header("content-length", str(len(encoded)))
-            resp.set_body([encoded])
+            resp.set_body(compress_stream([encoded], connect_req.compression.compressor()))
         elif server_resp.error is not None:
             resp.set_from_error(server_resp.error)
         else:
