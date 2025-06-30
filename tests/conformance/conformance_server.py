@@ -305,7 +305,7 @@ def prepare_sync(sc_req: ServerCompatRequest) -> tuple[ServerCompatResponse, Soc
     wsgi_app = wsgi_conformance_service(app)
     sock, port = create_bound_socket()
 
-    cfg = {}
+    cfg: dict[str, str | ssl.VerifyMode] = {}
     if sc_req.use_tls:
         if sc_req.client_tls_cert != b"":
             cfg["cert_reqs"] = ssl.VerifyMode.CERT_REQUIRED
