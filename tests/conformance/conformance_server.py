@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import socket
 import ssl
 import sys
@@ -8,6 +7,7 @@ import tempfile
 import time
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
+from typing import Any
 
 from google.protobuf.any_pb2 import Any as ProtoAny
 from gunicorn.app.base import BaseApplication  # type:ignore[ import-untyped]
@@ -17,7 +17,6 @@ from conformance import multidict_to_proto
 from conformance import proto_to_exception
 from conformance import read_size_delimited_message
 from conformance import write_size_delimited_message
-from connectrpc.conformance.v1.config_pb2 import TLSCreds
 from connectrpc.conformance.v1.server_compat_pb2 import ServerCompatRequest
 from connectrpc.conformance.v1.server_compat_pb2 import ServerCompatResponse
 from connectrpc.conformance.v1.service_pb2 import BidiStreamRequest
@@ -265,9 +264,10 @@ class SocketGunicornApp(BaseApplication):  # type:ignore[misc]
 
     """
 
-    def __init__(self, app: WSGIApplication, sock: socket.socket):
+    def __init__(self, app: WSGIApplication, sock: socket.socket, extra_config: dict[str, Any]):
         self.app = app
         self.sock = sock
+        self.extra_config = extra_config
         super().__init__()
 
     def load_config(self) -> None:
@@ -275,6 +275,8 @@ class SocketGunicornApp(BaseApplication):  # type:ignore[misc]
         self.cfg.set("bind", f"fd://{self.sock.fileno()}")
         self.cfg.set("preload_app", True)
         self.cfg.set("workers", 8)
+        for k, v in self.extra_config.items():
+            self.cfg.set(k, v)
 
     def load(self) -> WSGIApplication:
         return self.app
@@ -302,31 +304,24 @@ def prepare_sync(sc_req: ServerCompatRequest) -> tuple[ServerCompatResponse, Soc
     app = Conformance()
     wsgi_app = wsgi_conformance_service(app)
     sock, port = create_bound_socket()
-    server = SocketGunicornApp(wsgi_app, sock)
 
-    response = ServerCompatResponse(host="127.0.0.1", port=port)
+    cfg = {}
+    if sc_req.use_tls:
+        if sc_req.client_tls_cert != b"":
+            cfg["cert_reqs"] = ssl.VerifyMode.CERT_REQUIRED
+
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pem") as cert_file:
+            cert_file.write(sc_req.server_creds.cert)
+            cfg["certfile"] = cert_file.name
+
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pem") as key_file:
+            key_file.write(sc_req.server_creds.key)
+            cfg["keyfile"] = key_file.name
+
+    server = SocketGunicornApp(wsgi_app, sock, cfg)
+
+    response = ServerCompatResponse(host="127.0.0.1", port=port, pem_cert=sc_req.server_creds.cert)
     return response, server
-
-
-def create_ssl_context_from_tls_creds(tls_creds: TLSCreds) -> ssl.SSLContext:
-    """Create an SSLContext from TLSCreds protobuf message."""
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-
-    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pem") as cert_file:
-        cert_file.write(tls_creds.cert)
-        cert_path = cert_file.name
-
-    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pem") as key_file:
-        key_file.write(tls_creds.key)
-        key_path = key_file.name
-
-    try:
-        context.load_cert_chain(cert_path, key_path)
-    finally:
-        os.unlink(cert_path)
-        os.unlink(key_path)
-
-    return context
 
 
 def main(mode: str) -> None:

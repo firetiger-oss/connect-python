@@ -18,7 +18,7 @@ features:
     - STREAM_TYPE_HALF_DUPLEX_BIDI_STREAM
   supports_half_duplex_bidi_over_http1: true
   supports_h2c: false
-  supports_tls: false
+  supports_tls: true
   supports_tls_client_certs: false
   supports_trailers: false
   supports_connect_get: false
