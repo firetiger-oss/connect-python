@@ -1,5 +1,7 @@
 # Connect Python
 
+[![Documentation Status](https://readthedocs.org/projects/connect-python/badge/?version=latest)](https://connect-python.readthedocs.io/en/latest/?badge=latest)
+
 A Python implementation of the Connect RPC framework.
 
 This provides an asynchronous client runtime, as well as a client code
