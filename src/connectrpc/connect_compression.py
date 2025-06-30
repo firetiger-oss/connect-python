@@ -17,7 +17,7 @@ class Compressor(Protocol):
 
 
 def compress_stream(stream: Iterable[bytes], compressor: Compressor) -> Iterable[bytes]:
-    def compressed():
+    def compressed() -> Iterable[bytes]:
         for b in stream:
             yield compressor.compress(b)
         yield compressor.flush()
@@ -77,14 +77,14 @@ try:
 
     class BrotliCompressor:
         def compress(self, data: bytes) -> bytes:
-            return brotli.compress(data)
+            return brotli.compress(data)  # type: ignore[no-any-return]
 
         def flush(self) -> bytes:
             return b""
 
     class BrotliDecompressor:
         def decompress(self, data: bytes) -> bytes:
-            return brotli.decompress(data)
+            return brotli.decompress(data)  # type: ignore[no-any-return]
 
     BrotliCodec = CompressionCodec("br", BrotliCompressor, BrotliDecompressor)
     SUPPORTED_COMPRESSIONS["br"] = BrotliCodec
@@ -95,21 +95,21 @@ except ImportError:
 # Lots of ways zstd might be available...
 try:
     # Python 3.14 makes zstd available in the standard library
-    from compression import zstd
+    from compression import zstd  # type:ignore[import-not-found]
 
     class ZstdCompressor:
-        def __init__(self):
+        def __init__(self) -> None:
             self.compressor = zstd.ZstdCompressor()
 
         def compress(self, data: bytes) -> bytes:
-            return self.compressor.compress(data)
+            return self.compressor.compress(data)  # type: ignore[no-any-return]
 
         def flush(self) -> bytes:
-            return self.compressor.flush()
+            return self.compressor.flush()  # type: ignore[no-any-return]
 
     class ZstdDecompressor:
         def decompress(self, data: bytes) -> bytes:
-            return zstd.decompress(data)
+            return zstd.decompress(data)  # type: ignore[no-any-return]
 
     ZstdCodec = CompressionCodec("zstd", ZstdCompressor, ZstdDecompressor)
     SUPPORTED_COMPRESSIONS["zstd"] = ZstdCodec
@@ -119,8 +119,8 @@ except ImportError:
     try:
         import pyzstd
 
-        class ZstdCompressor:
-            def __init__(self):
+        class ZstdCompressor:  # type: ignore[no-redef]
+            def __init__(self) -> None:
                 self.compressor = pyzstd.ZstdCompressor()
 
             def compress(self, data: bytes) -> bytes:
@@ -129,7 +129,7 @@ except ImportError:
             def flush(self) -> bytes:
                 return self.compressor.flush()
 
-        class ZstdDecompressor:
+        class ZstdDecompressor:  # type: ignore[no-redef]
             def decompress(self, data: bytes) -> bytes:
                 return pyzstd.decompress(data)
 
