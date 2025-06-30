@@ -112,7 +112,7 @@ uv sync --group dev
 
 # Test version detection (works after editable install)
 uv pip install -e .
-uv run python -c "from importlib.metadata import version; print(version('firetiger-connect-python'))"
+uv run python -c "from importlib.metadata import version; print(version(connect-python'))"
 
 # Test build
 uv build

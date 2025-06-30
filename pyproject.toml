@@ -3,7 +3,7 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "firetiger-connect-python"
+name = "connect-python"
 dynamic = ["version"]
 description = "Client runtime library for Connect RPC"
 readme = "README.md"
