@@ -18,6 +18,24 @@ class EndStreamResponse:
     error: ConnectError | None
     metadata: CIMultiDict[str]
 
+    def to_json(self) -> bytes:
+        md: dict[str, list[str]] = {}
+        for k, v in self.metadata.items():
+            if k not in md:
+                md[k] = []
+            md[k].append(v)
+
+        if self.error is None:
+            if len(self.metadata) == 0:
+                return b"{}"
+            else:
+                return json.dumps({"metadata": md}).encode()
+        else:
+            if len(self.metadata) == 0:
+                return json.dumps({"error": self.error.to_dict()}).encode()
+            else:
+                return json.dumps({"error": self.error.to_dict(), "metadata": md}).encode()
+
     @classmethod
     def from_bytes(cls, data: bytes | bytearray) -> EndStreamResponse:
         data_dict = json.loads(data)

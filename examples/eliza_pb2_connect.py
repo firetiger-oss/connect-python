@@ -1,21 +1,36 @@
 # Generated Connect client code
 
+from __future__ import annotations
 from collections.abc import AsyncIterator
 from collections.abc import Iterator
 from collections.abc import Iterable
 import aiohttp
 import urllib3
+import typing
+import sys
 
 from connectrpc.client_async import AsyncConnectClient
 from connectrpc.client_sync import ConnectClient
 from connectrpc.client_protocol import ConnectProtocol
 from connectrpc.client_connect import ConnectProtocolError
 from connectrpc.headers import HeaderInput
+from connectrpc.server_sync import ClientRequest
+from connectrpc.server_sync import ClientStream
+from connectrpc.server_sync import ConnectWSGI
+from connectrpc.server_sync import ServerResponse
+from connectrpc.server_sync import ServerStream
 from connectrpc.streams import StreamInput
 from connectrpc.streams import AsyncStreamOutput
 from connectrpc.streams import StreamOutput
 from connectrpc.unary import UnaryOutput
 from connectrpc.unary import ClientStreamingOutput
+
+if typing.TYPE_CHECKING:
+    # wsgiref.types was added in Python 3.11.
+    if sys.version_info >= (3, 11):
+        from wsgiref.types import WSGIApplication
+    else:
+        from _typeshed.wsgi import WSGIApplication
 
 import eliza_pb2
 
@@ -93,6 +108,7 @@ class ElizaServiceClient:
         return self._connect_client.call_server_streaming(
             url, req, eliza_pb2.IntroduceResponse, extra_headers, timeout_seconds
         )
+
 
 class AsyncElizaServiceClient:
     def __init__(
@@ -173,3 +189,21 @@ class AsyncElizaServiceClient:
             url, req, eliza_pb2.IntroduceResponse, extra_headers, timeout_seconds
         )
 
+
+@typing.runtime_checkable
+class ElizaServiceProtocol(typing.Protocol):
+    def say(self, req: ClientRequest[eliza_pb2.SayRequest]) -> ServerResponse[eliza_pb2.SayResponse]:
+        ...
+    def converse(self, req: ClientStream[eliza_pb2.ConverseRequest]) -> ServerStream[eliza_pb2.ConverseResponse]:
+        ...
+    def introduce(self, req: ClientRequest[eliza_pb2.IntroduceRequest]) -> ServerStream[eliza_pb2.IntroduceResponse]:
+        ...
+
+ELIZA_SERVICE_PATH_PREFIX = "/connectrpc.eliza.v1.ElizaService"
+
+def wsgi_eliza_service(implementation: ElizaServiceProtocol) -> WSGIApplication:
+    app = ConnectWSGI()
+    app.register_unary_rpc("/connectrpc.eliza.v1.ElizaService/Say", implementation.say, eliza_pb2.SayRequest)
+    app.register_bidi_streaming_rpc("/connectrpc.eliza.v1.ElizaService/Converse", implementation.converse, eliza_pb2.ConverseRequest)
+    app.register_server_streaming_rpc("/connectrpc.eliza.v1.ElizaService/Introduce", implementation.introduce, eliza_pb2.IntroduceRequest)
+    return app
