@@ -76,6 +76,9 @@ class ConformanceServiceClient:
         if err is not None:
             raise err
         yield from stream_output
+        err = stream_output.error()
+        if err is not None:
+            raise err
 
     def call_server_stream(
         self, req: connectrpc.conformance.v1.service_pb2.ServerStreamRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -120,6 +123,9 @@ class ConformanceServiceClient:
         if err is not None:
             raise err
         yield from stream_output
+        err = stream_output.error()
+        if err is not None:
+            raise err
 
     def call_bidi_stream(
         self, reqs: Iterable[connectrpc.conformance.v1.service_pb2.BidiStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -215,6 +221,9 @@ class AsyncConformanceServiceClient:
         async with stream_output as stream:
             async for response in stream:
                 yield response
+            err = stream.error()
+            if err is not None:
+                raise err
 
     async def call_server_stream(
         self, req: connectrpc.conformance.v1.service_pb2.ServerStreamRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -261,6 +270,9 @@ class AsyncConformanceServiceClient:
         async with stream_output as stream:
             async for response in stream:
                 yield response
+            err = stream.error()
+            if err is not None:
+                raise err
 
     async def call_bidi_stream(
         self, reqs: StreamInput[connectrpc.conformance.v1.service_pb2.BidiStreamRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
