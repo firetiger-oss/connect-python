@@ -76,6 +76,9 @@ class ElizaServiceClient:
         if err is not None:
             raise err
         yield from stream_output
+        err = stream_output.error()
+        if err is not None:
+            raise err
 
     def call_converse(
         self, reqs: Iterable[eliza_pb2.ConverseRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -99,6 +102,9 @@ class ElizaServiceClient:
         if err is not None:
             raise err
         yield from stream_output
+        err = stream_output.error()
+        if err is not None:
+            raise err
 
     def call_introduce(
         self, req: eliza_pb2.IntroduceRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -154,6 +160,9 @@ class AsyncElizaServiceClient:
         async with stream_output as stream:
             async for response in stream:
                 yield response
+            err = stream.error()
+            if err is not None:
+                raise err
 
     async def call_converse(
         self, reqs: StreamInput[eliza_pb2.ConverseRequest], extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
@@ -179,6 +188,9 @@ class AsyncElizaServiceClient:
         async with stream_output as stream:
             async for response in stream:
                 yield response
+            err = stream.error()
+            if err is not None:
+                raise err
 
     async def call_introduce(
         self, req: eliza_pb2.IntroduceRequest,extra_headers: HeaderInput | None=None, timeout_seconds: float | None=None
