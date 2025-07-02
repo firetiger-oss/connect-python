@@ -182,8 +182,8 @@ class SyncClientGenerator:
         self.g.P("    yield from stream_output")
         self.g.P("    err = stream_output.error()")
         self.g.P("    if err is not None:")
-        self.g.P("        raise err")                
-        
+        self.g.P("        raise err")
+
         self.g.P()
 
         self.g.P("def call_", m.py_name, "(")
@@ -253,8 +253,8 @@ class SyncClientGenerator:
         self.g.P("    yield from stream_output")
         self.g.P("    err = stream_output.error()")
         self.g.P("    if err is not None:")
-        self.g.P("        raise err")                
-        
+        self.g.P("        raise err")
+
         self.g.P()
 
         # Stream method for metadata access
@@ -378,7 +378,7 @@ class AsyncClientGenerator:
         self.g.P("            yield response")
         self.g.P("        err = stream.error()")
         self.g.P("        if err is not None:")
-        self.g.P("            raise err")                
+        self.g.P("            raise err")
         self.g.P()
 
         self.g.P("async def call_", m.py_name, "(")
@@ -459,8 +459,8 @@ class AsyncClientGenerator:
         self.g.P("            yield response")
         self.g.P("        err = stream.error()")
         self.g.P("        if err is not None:")
-        self.g.P("            raise err")                
-        
+        self.g.P("            raise err")
+
         self.g.P()
 
         # Stream method for metadata access

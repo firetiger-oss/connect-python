@@ -4,7 +4,6 @@ import struct
 import sys
 from collections.abc import Callable
 from collections.abc import Iterable
-from enum import Enum
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypeVar
@@ -22,6 +21,7 @@ from connectrpc.server import ServerResponse
 from connectrpc.server import ServerStream
 from connectrpc.server_requests import ConnectStreamingRequest
 from connectrpc.server_requests import ConnectUnaryRequest
+from connectrpc.server_rpc_types import RPCType
 from connectrpc.server_wsgi import WSGIRequest
 from connectrpc.server_wsgi import WSGIResponse
 from connectrpc.streams_connect import EndStreamResponse
@@ -43,13 +43,6 @@ UnaryRPC = Callable[[ClientRequest[T]], ServerResponse[U]]
 ClientStreamingRPC = Callable[[ClientStream[T]], ServerResponse[U]]
 ServerStreamingRPC = Callable[[ClientRequest[T]], ServerStream[U]]
 BidiStreamingRPC = Callable[[ClientStream[T]], ServerStream[U]]
-
-
-class RPCType(Enum):
-    UNARY = 1
-    CLIENT_STREAMING = 2
-    SERVER_STREAMING = 3
-    BIDI_STREAMING = 4
 
 
 class ConnectWSGI:
