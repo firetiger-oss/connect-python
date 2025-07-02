@@ -10,6 +10,7 @@ import pytest
 
 from connectrpc.errors import ConnectError
 from connectrpc.server_asgi_io import AsyncRequestBodyReader
+from connectrpc.server_asgi_io import AsyncResponseSender
 
 
 class MockASGIReceive:
@@ -283,3 +284,103 @@ class TestAsyncRequestBodyReader:
 
         # Verify complete data
         assert part1 + part2 == body_data
+
+
+class MockASGISend:
+    """Mock ASGI send callable for testing."""
+
+    def __init__(self, should_fail: bool = False):
+        """
+        Initialize with optional failure mode.
+
+        Args:
+            should_fail: Whether send operations should raise exceptions
+        """
+        self.events: list[dict[str, Any]] = []
+        self.should_fail = should_fail
+
+    async def __call__(self, event: dict[str, Any]) -> None:
+        """Record the sent event or raise if configured to fail."""
+        if self.should_fail:
+            raise RuntimeError("Mock send failure")
+        self.events.append(event)
+
+
+class TestAsyncResponseSender:
+    """Test cases for AsyncResponseSender."""
+
+    @pytest.mark.asyncio
+    async def test_simple_response_start_and_body(self):
+        """Test sending a simple response with start and single body."""
+        send = MockASGISend()
+        sender = AsyncResponseSender(send)
+
+        # Send start
+        await sender.send_start(200, [(b"content-type", b"text/plain")])
+
+        # Send body
+        await sender.send_body(b"Hello, world!", more_body=False)
+
+        assert len(send.events) == 2
+
+        # Check start event
+        start_event = send.events[0]
+        assert start_event["type"] == "http.response.start"
+        assert start_event["status"] == 200
+        assert start_event["headers"] == [(b"content-type", b"text/plain")]
+        assert start_event["trailers"] is False
+
+        # Check body event
+        body_event = send.events[1]
+        assert body_event["type"] == "http.response.body"
+        assert body_event["body"] == b"Hello, world!"
+        assert body_event["more_body"] is False
+
+    @pytest.mark.asyncio
+    async def test_async_context_manager_basic(self):
+        """Test using AsyncResponseSender as async context manager."""
+        send = MockASGISend()
+
+        async with AsyncResponseSender(send) as sender:
+            await sender.send_start(200, [(b"content-type", b"text/plain")])
+            await sender.send_body(b"Hello, world!")  # more_body=True by default
+
+        # Should have automatically finished the response with final empty body
+        assert len(send.events) == 3
+
+        # Check the body events
+        first_body = send.events[1]
+        assert first_body["body"] == b"Hello, world!"
+        assert first_body["more_body"] is True
+
+        final_body = send.events[2]
+        assert final_body["body"] == b""
+        assert final_body["more_body"] is False
+
+    @pytest.mark.asyncio
+    async def test_async_context_manager_with_trailers(self):
+        """Test async context manager with trailers."""
+        send = MockASGISend()
+
+        async with AsyncResponseSender(send) as sender:
+            await sender.send_start(200, [], trailers=True)
+            await sender.send_body(b"content")  # more_body=True by default
+            # Don't manually finish - let context manager handle trailers
+
+        # Should have sent start, content body, final body, and empty trailers
+        assert len(send.events) == 4
+
+        # Check events in order
+        assert send.events[0]["type"] == "http.response.start"
+        assert send.events[0]["trailers"] is True
+
+        assert send.events[1]["type"] == "http.response.body"
+        assert send.events[1]["body"] == b"content"
+        assert send.events[1]["more_body"] is True
+
+        assert send.events[2]["type"] == "http.response.body"
+        assert send.events[2]["body"] == b""
+        assert send.events[2]["more_body"] is False
+
+        assert send.events[3]["type"] == "http.response.trailers"
+        assert send.events[3]["headers"] == []
