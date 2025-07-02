@@ -54,6 +54,7 @@ dev = [
     "sphinx-rtd-theme>=2.0.0",
     "sphinx-autodoc-typehints>=1.25.0",
     "linkify-it-py>=2.0.0",
+    "uvicorn>=0.35.0",
 ]
 
 [project.scripts]

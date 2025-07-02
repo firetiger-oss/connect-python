@@ -13,6 +13,8 @@ from asgiref.typing import HTTPRequestEvent
 from asgiref.typing import HTTPResponseBodyEvent
 from asgiref.typing import HTTPResponseStartEvent
 from asgiref.typing import HTTPResponseTrailersEvent
+from asgiref.typing import HTTPScope
+from multidict import CIMultiDict
 
 from connectrpc.errors import ConnectError
 from connectrpc.errors import ConnectErrorCode
@@ -323,3 +325,144 @@ class AsyncResponseSender:
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit - ensures response is finished."""
         await self.finish()
+
+
+class ASGIScope:
+    """ASGI scope wrapper that extracts HTTP connection metadata.
+
+    Provides a compatibility layer matching WSGIRequest interface for use
+    with existing Connect protocol processing, while handling ASGI-specific
+    metadata extraction and normalization.
+
+    Handles header normalization from ASGI's [[bytes, bytes], ...] format
+    to a case-insensitive multidict, and provides convenient access to
+    common HTTP metadata like method, path, query string, and content-type.
+    """
+
+    def __init__(self, scope: HTTPScope):
+        """
+        Initialize the ASGI scope wrapper.
+
+        Args:
+            scope: ASGI HTTP scope containing request metadata
+
+        Raises:
+            ValueError: If scope type is not 'http'
+        """
+        if scope["type"] != "http":
+            raise ValueError(f"Expected HTTP scope, got {scope['type']}")
+
+        self._scope = scope
+        self.headers = self._normalize_headers(scope.get("headers", []))
+
+        # Extract commonly used values
+        self.method = self._scope.get("method", "GET").upper()
+        self.path = self._scope.get("path", "/")
+        self.query_string = self._scope.get("query_string", b"")
+        self.content_type = self.headers.get("content-type", "").lower()
+        self.http_version = self._scope.get("http_version", "1.1")
+        self.scheme = self._scope.get("scheme", "http")
+        self.root_path = self._scope.get("root_path", "")
+
+        # Parse content-length with error handling
+        length_str = self.headers.get("content-length", "0")
+        try:
+            self.content_length = int(length_str) if length_str else 0
+        except ValueError:
+            self.content_length = 0
+
+    def _normalize_headers(self, headers: list[list[bytes]]) -> CIMultiDict[str]:
+        """
+        Normalize ASGI headers to case-insensitive multidict.
+
+        ASGI headers are provided as [[bytes, bytes], ...] format.
+        Header names should be lowercased per ASGI spec, but we handle
+        case normalization for compatibility.
+
+        Args:
+            headers: ASGI headers as list of [name, value] byte pairs
+
+        Returns:
+            Case-insensitive multidict of header name->value strings
+        """
+        normalized = CIMultiDict[str]()
+
+        for header_pair in headers:
+            if len(header_pair) != 2:
+                continue  # Skip malformed headers
+
+            name_bytes, value_bytes = header_pair
+
+            # Decode bytes to strings, handling potential encoding issues
+            try:
+                name = name_bytes.decode("latin-1").lower()
+                value = value_bytes.decode("latin-1")
+
+                # Validate header name - must be ASCII and not empty
+                if not name or not name.isascii() or any(ord(c) < 32 for c in name):
+                    continue
+
+                # Validate header value - must be ASCII (printable or tab/space)
+                if not value.isascii():
+                    continue
+
+                normalized.add(name, value)
+            except (UnicodeDecodeError, AttributeError, TypeError):
+                # Skip headers that can't be decoded
+                continue
+
+        return normalized
+
+    def get_server(self) -> tuple[str, int | None] | None:
+        """
+        Get server host and port as (host, port) tuple.
+
+        Returns None if server information is not available.
+        Port may be None for Unix sockets.
+        """
+        server = self._scope.get("server")
+        if server is not None:
+            return tuple(server)
+        return None
+
+    def get_client(self) -> tuple[str, int] | None:
+        """
+        Get client host and port as (host, port) tuple.
+
+        Returns None if client information is not available.
+        """
+        client = self._scope.get("client")
+        if client is not None:
+            return tuple(client)
+        return None
+
+    def get_header(self, name: str, default: str | None = None) -> str | None:
+        """
+        Get a single header value by name.
+
+        Args:
+            name: Header name (case-insensitive)
+            default: Default value if header is not present
+
+        Returns:
+            Header value or default if not found
+        """
+        return self.headers.get(name.lower(), default)
+
+    def get_headers(self, name: str) -> list[str]:
+        """
+        Get all header values for a given name.
+
+        Args:
+            name: Header name (case-insensitive)
+
+        Returns:
+            List of header values (empty list if header not present)
+        """
+        return self.headers.getall(name.lower(), [])
+
+    def __repr__(self) -> str:
+        """String representation for debugging."""
+        return (
+            f"ASGIScope(method={self.method}, path={self.path}, content_type={self.content_type})"
+        )
