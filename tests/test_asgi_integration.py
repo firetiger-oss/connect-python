@@ -1,7 +1,6 @@
 """Integration test for ConnectASGI server with real ASGI server."""
 
 import asyncio
-import json
 import threading
 import time
 from typing import TYPE_CHECKING
@@ -48,6 +47,7 @@ class ASGITestServer:
             try:
                 # Just check if the port is open by attempting to connect
                 import socket
+
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(1)
                 result = sock.connect_ex((self.host, self.port))
@@ -100,53 +100,60 @@ def test_server(echo_app):
 async def test_real_asgi_server_integration(test_server):
     """Test ConnectASGI with a real uvicorn server."""
     # Test successful RPC call
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(
             f"{test_server.url}/testing.TestingService/Echo",
             headers={"content-type": "application/json"},
             json={"message": "hello world"},
-            timeout=aiohttp.ClientTimeout(total=5)
-        ) as response:
-            assert response.status == 200
-            assert response.headers["content-type"] == "application/json"
-            
-            result = await response.json()
-            assert result["message"] == "echo: hello world"
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as response,
+    ):
+        assert response.status == 200
+        assert response.headers["content-type"] == "application/json"
+
+        result = await response.json()
+        assert result["message"] == "echo: hello world"
 
 
 @pytest.mark.asyncio
 async def test_real_asgi_server_404(test_server):
     """Test 404 handling with real server."""
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(
             f"{test_server.url}/unknown/path",
             headers={"content-type": "application/json"},
             json={"message": "test"},
-            timeout=aiohttp.ClientTimeout(total=5)
-        ) as response:
-            assert response.status == 404
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as response,
+    ):
+        assert response.status == 404
 
 
 @pytest.mark.asyncio
 async def test_real_asgi_server_405(test_server):
     """Test 405 handling with real server."""
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
-            f"{test_server.url}/testing.TestingService/Echo",
-            timeout=aiohttp.ClientTimeout(total=5)
-        ) as response:
-            assert response.status == 405
-            assert "POST" in response.headers.get("allow", "")
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(
+            f"{test_server.url}/testing.TestingService/Echo", timeout=aiohttp.ClientTimeout(total=5)
+        ) as response,
+    ):
+        assert response.status == 405
+        assert "POST" in response.headers.get("allow", "")
 
 
 @pytest.mark.asyncio
 async def test_real_asgi_server_invalid_content_type(test_server):
     """Test 415 handling with real server."""
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(
             f"{test_server.url}/testing.TestingService/Echo",
             headers={"content-type": "text/plain"},
             data="invalid data",
-            timeout=aiohttp.ClientTimeout(total=5)
-        ) as response:
-            assert response.status == 415
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as response,
+    ):
+        assert response.status == 415

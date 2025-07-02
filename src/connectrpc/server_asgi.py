@@ -97,7 +97,7 @@ class ConnectASGI:
         """
         # Create ASGIResponse wrapper early for consistent interface
         response = ASGIResponse(send)
-        
+
         # Handle connection type - only HTTP is supported
         if scope["type"] == "websocket":
             await self._reject_websocket(scope, receive, send)

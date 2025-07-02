@@ -37,7 +37,7 @@ generate:
     cd tests && buf generate --path testing_service.proto
 
 # Run conformance tests
-conformance-test: conformance-test-client-async conformance-test-client-sync conformance-test-server-sync
+conformance-test: conformance-test-client-async conformance-test-client-sync conformance-test-server-sync conformance-test-server-async
 
 # Run conformance tests of async client implementation
 conformance-test-client-async *ARGS:
@@ -97,6 +97,25 @@ conformance-test-server-sync *ARGS:
         {{ARGS}} \
         -- \
     	uv run python conformance_server.py sync
+
+# Run conformance tests of async server implementation
+conformance-test-server-async *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v connectconformance &> /dev/null; then
+        echo "Error: connectconformance binary not found in PATH"
+        echo "Please install it with: go install connectrpc.com/conformance/cmd/connectconformance@latest"
+        echo "Or download from: https://github.com/connectrpc/conformance/releases"
+        exit 1
+    fi
+    cd tests/conformance
+
+    connectconformance \
+        --conf ./asgi_unary_config.yaml \
+        --mode server \
+        {{ARGS}} \
+        -- \
+    	uv run python conformance_server_asgi.py async
 
 # Clean all cache files and rebuild environment
 clean:
