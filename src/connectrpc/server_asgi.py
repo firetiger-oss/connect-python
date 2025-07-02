@@ -16,6 +16,7 @@ from asgiref.typing import ASGI3Application
 from asgiref.typing import ASGIReceiveCallable
 from asgiref.typing import ASGISendCallable
 from asgiref.typing import HTTPScope
+from asgiref.typing import LifespanScope
 from asgiref.typing import Scope
 from asgiref.typing import WebSocketCloseEvent
 from asgiref.typing import WebSocketScope
@@ -103,59 +104,70 @@ class ConnectASGI:
             receive: ASGI receive callable for reading request body
             send: ASGI send callable for sending responses
         """
-        # Create ASGIResponse wrapper early for consistent interface
-        response = ASGIResponse(send)
-
-        # Handle connection type - only HTTP is supported
+        # Handle non-HTTP scope types first
         if scope["type"] == "websocket":
             await self._reject_websocket(scope, receive, send)
             return
+        elif scope["type"] == "lifespan":
+            await self._handle_lifespan(scope, receive, send)
+            return
         elif scope["type"] != "http":
-            # Unknown scope type, reject with 400
-            await self._send_error_response(
-                400, "Bad Request", b"Unsupported ASGI scope type", response
-            )
+            # Unknown scope type - can't create HTTP response, so just log and return
+            self._logger.warning(f"Unsupported ASGI scope type: {scope['type']}")  # type:ignore[unreachable]
             return
 
-        # Cast to HTTP scope for type checking
-        http_scope: HTTPScope = scope
+        # Create ASGIResponse wrapper for HTTP requests
+        response = ASGIResponse(send)
+        rpc_type: RPCType | None = None
 
-        # Validate HTTP method - only POST is supported
-        method = http_scope["method"]
-        if method != "POST":
-            await self._send_error_response(
-                405, "Method Not Allowed", b"", response, extra_headers=[(b"allow", b"POST")]
-            )
-            return
-
-        # Route the request based on path
-        path = http_scope["path"]
-        rpc_type = self.rpc_types.get(path)
-        if rpc_type is None:
-            await self._send_error_response(404, "Not Found", b"", response)
-            return
-
-        # Dispatch to appropriate RPC handler
         try:
+            # Cast to HTTP scope for type checking
+            http_scope: HTTPScope = scope
+
+            # Validate HTTP method - only POST is supported
+            method = http_scope["method"]
+            if method != "POST":
+                self._logger.debug(f"Method not allowed: {method} (only POST supported)")
+                await self._send_error_response(
+                    405, "Method Not Allowed", b"", response, extra_headers=[(b"allow", b"POST")]
+                )
+                return
+
+            # Route the request based on path
+            path = http_scope["path"]
+            rpc_type = self.rpc_types.get(path)
+            if rpc_type is None:
+                self._logger.debug(f"RPC path not found: {path}")
+                await self._send_error_response(404, "Not Found", b"", response)
+                return
+
+            # Log successful RPC routing
+            self._logger.debug(f"Routing {method} {path} to {rpc_type.name} RPC")
+
+            # Dispatch to appropriate RPC handler
             if rpc_type == RPCType.UNARY:
                 await self._handle_unary_rpc(http_scope, receive, response)
             else:
                 # Streaming RPCs will be implemented in later tasks
+                self._logger.warning(f"Streaming RPC not yet implemented: {rpc_type}")
                 await self._send_error_response(
                     501, "Not Implemented", b"Streaming RPCs not yet implemented", response
                 )
+
         except ConnectError as err:
             # Handle Connect protocol errors
-            await self._handle_connect_error(err, response, rpc_type)
+            self._logger.info(f"Connect protocol error: {err.code.name} - {err.message}")
+            await self._handle_connect_error(err, response, rpc_type or RPCType.UNARY)
+        except ConnectionError as err:
+            # Handle connection errors (disconnect, timeout, etc.)
+            self._logger.info(f"Connection error: {err}")
+            # Don't try to send response on connection error - connection is likely dead
+            raise
         except Exception as err:
             # Handle unexpected errors
-            import traceback
-
-            from .debugprint import debug
-
-            debug("got exception: ", traceback.format_exc())
+            self._logger.error(f"Unexpected error processing request: {err}", exc_info=True)
             connect_err = ConnectError(ConnectErrorCode.INTERNAL, str(err))
-            await self._handle_connect_error(connect_err, response, rpc_type)
+            await self._handle_connect_error(connect_err, response, rpc_type or RPCType.UNARY)
 
     async def _reject_websocket(
         self, scope: WebSocketScope, receive: ASGIReceiveCallable, send: ASGISendCallable
@@ -167,6 +179,30 @@ class ConnectASGI:
             "reason": "",
         }
         await send(close_event)
+
+    async def _handle_lifespan(
+        self, scope: LifespanScope, receive: ASGIReceiveCallable, send: ASGISendCallable
+    ) -> None:
+        """Handle ASGI lifespan events (startup/shutdown)."""
+        while True:
+            message = await receive()
+            if message["type"] == "lifespan.startup":
+                try:
+                    # Application startup - nothing to do for ConnectRPC
+                    self._logger.debug("ASGI lifespan startup")
+                    await send({"type": "lifespan.startup.complete"})
+                except Exception as e:
+                    self._logger.error(f"Error during startup: {e}")
+                    await send({"type": "lifespan.startup.failed", "message": str(e)})
+            elif message["type"] == "lifespan.shutdown":
+                try:
+                    # Application shutdown - nothing to do for ConnectRPC
+                    self._logger.debug("ASGI lifespan shutdown")
+                    await send({"type": "lifespan.shutdown.complete"})
+                except Exception as e:
+                    self._logger.error(f"Error during shutdown: {e}")
+                    await send({"type": "lifespan.shutdown.failed", "message": str(e)})
+                break
 
     async def _send_error_response(
         self,
@@ -237,32 +273,49 @@ class ConnectASGI:
             receive: ASGI receive callable for reading request body
             response: ASGIResponse for sending responses
         """
-        # Create async Connect request with validation
-        connect_req = await AsyncConnectUnaryRequest.from_asgi(scope, receive, response._send)
-        if connect_req is None:
-            # Validation failed, error response already sent
-            return
+        path = scope["path"]
 
-        # Read and deserialize the request body
-        body_data = await connect_req.read_body()
-        msg = connect_req.serialization.deserialize(
-            body_data, self.rpc_input_types[connect_req.path]
-        )
+        try:
+            # Create async Connect request with validation
+            connect_req = await AsyncConnectUnaryRequest.from_asgi(scope, receive, response._send)
+            if connect_req is None:
+                # Validation failed, error response already sent
+                return
 
-        # Extract trailers from headers (headers starting with "trailer-")
-        trailers: CIMultiDict[str] = CIMultiDict()
-        for k, v in connect_req.headers.items():
-            if k.startswith("trailer-"):
-                trailers.add(k, v)
+            # Read and deserialize the request body
+            body_data = await connect_req.read_body()
+            msg = connect_req.serialization.deserialize(
+                body_data, self.rpc_input_types[connect_req.path]
+            )
 
-        # Create client request
-        client_req = ClientRequest(msg, connect_req.headers, trailers, connect_req.timeout)
+            # Extract trailers from headers (headers starting with "trailer-")
+            trailers: CIMultiDict[str] = CIMultiDict()
+            for k, v in connect_req.headers.items():
+                if k.startswith("trailer-"):
+                    trailers.add(k, v)
 
-        # Call the RPC handler (await it since it's async)
-        server_resp = await self.unary_rpcs[connect_req.path](client_req)
+            # Create client request
+            client_req = ClientRequest(msg, connect_req.headers, trailers, connect_req.timeout)
 
-        # Send the response
-        await self._send_unary_response(server_resp, connect_req, response)
+            # Call the RPC handler (await it since it's async)
+            self._logger.debug(f"Calling unary RPC handler for {path}")
+            server_resp = await self.unary_rpcs[connect_req.path](client_req)
+
+            # Send the response
+            await self._send_unary_response(server_resp, connect_req, response)
+            self._logger.debug(f"Successfully completed unary RPC for {path}")
+
+        except ConnectionError:
+            # Client disconnected - log and re-raise
+            self._logger.info(f"Client disconnected during unary RPC processing for {path}")
+            raise
+        except ConnectError:
+            # Connect protocol error - re-raise for upper handler
+            raise
+        except Exception as e:
+            # Log unexpected handler errors with more context
+            self._logger.error(f"Unary RPC handler error for {path}: {e}", exc_info=True)
+            raise
 
     async def _send_unary_response(
         self,

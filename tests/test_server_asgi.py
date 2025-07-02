@@ -1,6 +1,8 @@
 """Tests for ConnectASGI server implementation."""
 
+import asyncio
 import json
+import logging
 from unittest.mock import AsyncMock
 
 import pytest
@@ -372,3 +374,218 @@ class TestConnectASGI:
         trailer_header = next((h for h in headers if h[0] == b"trailer-x-custom-trailer"), None)
         assert trailer_header is not None
         assert trailer_header[1] == b"trailer-value"
+
+
+class TestConnectASGIErrorHandling:
+    """Test suite for ConnectASGI error handling and resilience."""
+
+    @pytest.fixture
+    def app_with_logger(self) -> ConnectASGI:
+        """Create a test ConnectASGI server with custom logger."""
+        logger = logging.getLogger("test_asgi")
+        logger.setLevel(logging.DEBUG)
+        return ConnectASGI(logger=logger)
+
+    def create_http_scope(
+        self,
+        method: str = "POST",
+        path: str = "/test.Service/Method",
+        headers: list[list[bytes]] | None = None,
+        content_type: str = "application/json",
+    ) -> HTTPScope:
+        """Create a test HTTP scope."""
+        if headers is None:
+            headers = [[b"content-type", content_type.encode()]]
+
+        return {
+            "type": "http",
+            "method": method,
+            "path": path,
+            "headers": headers,
+            "query_string": b"",
+            "root_path": "",
+            "scheme": "http",
+            "server": ("127.0.0.1", 8000),
+        }
+
+    def create_receive_with_disconnect(self, delay: float = 0.1) -> ASGIReceiveCallable:
+        """Create a receive callable that simulates client disconnect."""
+
+        async def receive():
+            await asyncio.sleep(delay)
+            return {"type": "http.disconnect"}
+
+        return receive
+
+    def create_receive_with_exception(self, exception: Exception) -> ASGIReceiveCallable:
+        """Create a receive callable that raises an exception."""
+
+        async def receive():
+            raise exception
+
+        return receive
+
+    @pytest.mark.asyncio
+    async def test_logging_configuration(self, app_with_logger: ConnectASGI):
+        """Test that logging is properly configured."""
+        # Test default logger
+        app1 = ConnectASGI()
+        assert app1._logger.name == "connectrpc.server_asgi"
+
+        # Test custom logger
+        custom_logger = logging.getLogger("custom")
+        app2 = ConnectASGI(logger=custom_logger)
+        assert app2._logger is custom_logger
+
+    @pytest.mark.asyncio
+    async def test_client_disconnect_during_body_reading(self, app_with_logger: ConnectASGI):
+        """Test proper handling of client disconnects during request body reading."""
+
+        # Register a simple handler
+        async def echo_handler(req: ClientRequest[EchoRequest]) -> ServerResponse[EchoResponse]:
+            response = EchoResponse()
+            response.message = f"echo: {req.msg.message}"
+            return ServerResponse(response)
+
+        path = "/testing.TestingService/Echo"
+        app_with_logger.register_unary_rpc(path, echo_handler, EchoRequest)
+
+        scope = self.create_http_scope(path=path)
+        # Disconnect during body reading
+        receive = self.create_receive_with_disconnect(0.01)
+        send = AsyncMock()
+
+        # Should handle disconnect gracefully
+        with pytest.raises(ConnectionError, match="Client disconnected"):
+            await app_with_logger(scope, receive, send)
+
+    @pytest.mark.asyncio
+    async def test_receive_exception_handling(self, app_with_logger: ConnectASGI):
+        """Test handling of exceptions during receive operations."""
+
+        # Register a handler so request gets to body reading stage
+        async def echo_handler(req: ClientRequest[EchoRequest]) -> ServerResponse[EchoResponse]:
+            response = EchoResponse()
+            response.message = f"echo: {req.msg.message}"
+            return ServerResponse(response)
+
+        path = "/test.Service/Method"
+        app_with_logger.register_unary_rpc(path, echo_handler, EchoRequest)
+
+        scope = self.create_http_scope(path=path)
+        receive = self.create_receive_with_exception(RuntimeError("Receive failed"))
+        send = AsyncMock()
+
+        with pytest.raises(ConnectionError, match="Failed to receive request data"):
+            await app_with_logger(scope, receive, send)
+
+    @pytest.mark.asyncio
+    async def test_error_logging_and_propagation(self, app_with_logger: ConnectASGI):
+        """Test that errors are properly logged and propagated."""
+
+        # Register a handler that raises an exception
+        async def failing_handler(req: ClientRequest[EchoRequest]) -> ServerResponse[EchoResponse]:
+            raise ValueError("Test handler error")
+
+        path = "/testing.TestingService/Echo"
+        app_with_logger.register_unary_rpc(path, failing_handler, EchoRequest)
+
+        request_body = json.dumps({"message": "test"}).encode()
+
+        async def receive():
+            return {"type": "http.request", "body": request_body, "more_body": False}
+
+        scope = self.create_http_scope(path=path)
+        send = AsyncMock()
+
+        # Should complete normally (error converted to Connect error response)
+        await app_with_logger(scope, receive, send)
+
+        # Should have sent error response
+        calls = send.call_args_list
+        assert len(calls) == 2  # start + body
+
+        start_call = calls[0]
+        assert start_call[0][0]["status"] == 500  # Internal error
+
+    @pytest.mark.asyncio
+    async def test_concurrent_error_handling(self, app_with_logger: ConnectASGI):
+        """Test handling of errors in concurrent requests."""
+
+        # Register handlers that sometimes fail
+        async def maybe_failing_handler(
+            req: ClientRequest[EchoRequest],
+        ) -> ServerResponse[EchoResponse]:
+            message = req.msg.message
+            if "fail" in message:
+                raise ValueError(f"Requested failure: {message}")
+
+            response = EchoResponse()
+            response.message = f"echo: {message}"
+            return ServerResponse(response)
+
+        path = "/testing.TestingService/Echo"
+        app_with_logger.register_unary_rpc(path, maybe_failing_handler, EchoRequest)
+
+        # Create mix of successful and failing requests
+        tasks = []
+        expected_results = []
+
+        for i in range(5):
+            message = f"fail-{i}" if i % 2 == 0 else f"success-{i}"
+            expected_results.append("error" if "fail" in message else "success")
+
+            async def make_request(msg: str):
+                request_body = json.dumps({"message": msg}).encode()
+
+                async def receive():
+                    return {"type": "http.request", "body": request_body, "more_body": False}
+
+                scope = self.create_http_scope(path=path)
+                send = AsyncMock()
+
+                await app_with_logger(scope, receive, send)
+
+                # Check if it was an error response
+                start_call = send.call_args_list[0]
+                status = start_call[0][0]["status"]
+                return "error" if status >= 400 else "success"
+
+            task = asyncio.create_task(make_request(message))
+            tasks.append(task)
+
+        # Wait for all requests to complete
+        results = await asyncio.gather(*tasks)
+
+        # Verify expected success/failure pattern
+        assert results == expected_results
+
+    @pytest.mark.asyncio
+    async def test_malformed_receive_data(self, app_with_logger: ConnectASGI):
+        """Test handling of malformed ASGI receive data."""
+
+        # Register a handler so request gets to body reading stage
+        async def echo_handler(req: ClientRequest[EchoRequest]) -> ServerResponse[EchoResponse]:
+            response = EchoResponse()
+            response.message = f"echo: {req.msg.message}"
+            return ServerResponse(response)
+
+        path = "/test.Service/Method"
+        app_with_logger.register_unary_rpc(path, echo_handler, EchoRequest)
+
+        async def malformed_receive():
+            # Return invalid ASGI message
+            return {"type": "invalid.message.type"}
+
+        scope = self.create_http_scope(path=path)
+        send = AsyncMock()
+
+        # Should handle malformed message gracefully and send error response
+        await app_with_logger(scope, malformed_receive, send)
+
+        # Should have sent error response (500 Internal Server Error)
+        calls = send.call_args_list
+        assert len(calls) == 2  # start + body
+
+        start_call = calls[0]
+        assert start_call[0][0]["status"] == 500  # Internal error

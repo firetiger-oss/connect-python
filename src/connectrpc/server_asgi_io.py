@@ -71,7 +71,11 @@ class AsyncRequestBodyReader:
         read_all = min_bytes == -1
 
         while (read_all or len(self._buffer) < min_bytes) and not self._eof:
-            message = await self._receive()
+            try:
+                message = await self._receive()
+            except Exception as e:
+                # Convert any receive error to ConnectionError for consistent handling
+                raise ConnectionError(f"Failed to receive request data: {e}") from e
 
             if message["type"] == "http.disconnect":
                 raise ConnectionError("Client disconnected during request body reading")
