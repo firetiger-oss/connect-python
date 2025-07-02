@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package testing;
+
+// Simple testing service for unit tests
+service TestingService {
+  // Simple echo RPC
+  rpc Echo(EchoRequest) returns (EchoResponse);
+
+  // RPC that can return errors
+  rpc Error(ErrorRequest) returns (ErrorResponse);
+
+  // RPC with headers and trailers
+  rpc HeaderTest(HeaderRequest) returns (HeaderResponse);
+
+  // Server streaming RPC (for future use)
+  rpc Download(DownloadRequest) returns (stream DownloadResponse);
+
+  // Client streaming RPC (for future use)
+  rpc Upload(stream UploadRequest) returns (UploadResponse);
+
+  // Bidirectional streaming RPC (for future use)
+  rpc Chatter(stream ChatterRequest) returns (stream ChatterResponse);
+}
+
+// Simple request/response messages for echo testing
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+  string message = 1;
+}
+
+// Messages for error testing
+message ErrorRequest {
+  string error_code = 1;  // ConnectErrorCode name
+  string error_message = 2;
+}
+
+message ErrorResponse {
+  string result = 1;
+}
+
+// Messages for header/trailer testing
+message HeaderRequest {
+  string message = 1;
+}
+
+message HeaderResponse {
+  string message = 1;
+}
+
+// Messages for streaming testing (future use)
+message DownloadRequest {
+  string message = 1;
+}
+
+message DownloadResponse {
+  string message = 1;
+  int32 sequence = 2;
+}
+
+message UploadRequest {
+  string message = 1;
+  int32 sequence = 2;
+}
+
+message UploadResponse {
+    string message = 1;
+}
+
+message ChatterRequest {
+  string message = 1;
+  int32 sequence = 2;
+}
+
+message ChatterResponse {
+  string message = 1;
+  int32 sequence = 2;
+}
