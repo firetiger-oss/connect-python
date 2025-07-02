@@ -1,6 +1,7 @@
 features:
   versions:
     - HTTP_VERSION_1
+    - HTTP_VERSION_2
   protocols:
     - PROTOCOL_CONNECT
   codecs:
@@ -14,7 +15,7 @@ features:
     - STREAM_TYPE_UNARY
   supports_half_duplex_bidi_over_http1: false
   supports_h2c: false
-  supports_tls: false
+  supports_tls: true
   supports_tls_client_certs: false
   supports_trailers: true
   supports_connect_get: false
