@@ -20,6 +20,7 @@ ASGI Server → ConnectASGI → Connect Protocol Processing → User Handlers
 2. **True Full-Duplex**: ASGI enables concurrent read/write, unlike current WSGI half-duplex limitation
 3. **Protocol Reuse**: Existing domain types (`ClientRequest`, `ServerResponse`) remain unchanged
 4. **Incremental Implementation**: Build from unary RPCs up to full streaming support
+5. **Early Conformance Testing**: Run conformance tests as features are implemented, starting with unary-only configuration
 
 ---
 
@@ -271,6 +272,42 @@ Creating an additional `AsyncStreamReader` layer would be redundant abstraction.
 
 ---
 
+### Task 9.5: ASGI Conformance Testing Infrastructure
+
+**Description**: Create ASGI conformance testing infrastructure based on the existing WSGI implementation, with unary-only configuration for early validation.
+
+**Context**: The existing conformance tests (`tests/conformance/`) provide comprehensive Connect protocol validation using YAML configuration files that specify supported features. We need an ASGI version that initially supports only unary RPCs, allowing incremental testing as streaming features are implemented. This follows the same pattern as the WSGI `conformance_server.py` but uses the new ASGI implementation.
+
+**Deliverables**:
+- `conformance_server_asgi.py` in `tests/conformance/`
+- ASGI conformance service implementation using `ConnectASGI`
+- `asgi_unary_config.yaml` - Initial config supporting only unary RPCs with basic features:
+  - `STREAM_TYPE_UNARY` only
+  - `PROTOCOL_CONNECT` only  
+  - `CODEC_PROTO` and `CODEC_JSON`
+  - `COMPRESSION_IDENTITY` only (no gzip/brotli initially)
+  - No HTTP/2, no trailers, no timeouts initially
+- Integration with uvicorn/hypercorn for ASGI server lifecycle
+- Command-line interface matching existing conformance server pattern
+- Proper error handling and logging for conformance test debugging
+
+**Success Criteria ("Done")**:
+- ASGI conformance server can be started and responds to basic health checks
+- Unary RPC conformance tests pass with the basic `ConnectASGI` implementation from Task 9
+- Configuration system allows incremental enabling of features (compression, streaming types, etc.)
+- Server lifecycle (startup/shutdown) works correctly with ASGI servers
+- Integration test: Can run against existing conformance test runner
+- Debugging: Clear error messages when tests fail due to unimplemented features
+
+**Files to Create/Modify**:
+- `tests/conformance/conformance_server_asgi.py` (new)
+- `tests/conformance/asgi_unary_config.yaml` (new)  
+- `tests/conformance/conftest.py` (extend with ASGI fixtures if needed)
+
+**Dependencies**: Requires completion of Tasks 1-9 (basic unary ASGI implementation)
+
+---
+
 ### Task 10: ConnectASGI Main Class - Unary RPC Routing
 
 **Description**: Implement unary RPC routing and handler dispatch within the ASGI event loop.
@@ -292,6 +329,7 @@ Creating an additional `AsyncStreamReader` layer would be redundant abstraction.
   - Handler exception propagation and error responses
 - Integration test: Multiple unary RPCs can be registered and work correctly
 - Performance test: Handler execution is properly async (doesn't block event loop)
+- **Conformance test: Basic unary conformance tests pass with `asgi_unary_config.yaml`**
 
 **Files to Create/Modify**:
 - `src/connectrpc/server_asgi.py` (extend)
@@ -320,6 +358,7 @@ Creating an additional `AsyncStreamReader` layer would be redundant abstraction.
   - ASGI protocol violations and recovery
 - Integration test: Server remains stable under error conditions
 - Load test: Server handles connection errors gracefully under load
+- **Conformance test: Complete unary conformance test suite passes (expand `asgi_unary_config.yaml` to include compression, error handling)**
 
 **Files to Create/Modify**:
 - `src/connectrpc/server_asgi.py` (extend)
@@ -437,7 +476,7 @@ Creating an additional `AsyncStreamReader` layer would be redundant abstraction.
   - Error handling in response streams
   - Proper Connect protocol compliance
 - Integration test: Server streaming works with real Connect clients
-- Conformance test: Behavior matches Connect protocol specification
+- **Conformance test: Update config to include `STREAM_TYPE_SERVER_STREAM` and validate server streaming conformance tests pass**
 
 **Files to Create/Modify**:
 - `src/connectrpc/server_asgi.py` (extend)
@@ -465,7 +504,7 @@ Creating an additional `AsyncStreamReader` layer would be redundant abstraction.
   - Error handling in request streams
   - Proper response generation and sending
 - Integration test: Client streaming works with real Connect clients
-- Conformance test: Protocol compliance for client streaming RPCs
+- **Conformance test: Update config to include `STREAM_TYPE_CLIENT_STREAM` and validate client streaming conformance tests pass**
 
 **Files to Create/Modify**:
 - `src/connectrpc/server_asgi.py` (extend)
@@ -495,7 +534,7 @@ Creating an additional `AsyncStreamReader` layer would be redundant abstraction.
   - Proper stream termination and cleanup
 - Integration test: True full-duplex operation (can send responses before consuming all requests)
 - Performance test: Concurrent streaming outperforms half-duplex implementation
-- Conformance test: Full Connect protocol compliance for bidirectional streaming
+- **Conformance test: Update config to include `STREAM_TYPE_HALF_DUPLEX_BIDI_STREAM`, validate full-duplex capabilities exceed WSGI implementation**
 
 **Files to Create/Modify**:
 - `src/connectrpc/server_asgi.py` (extend)
@@ -758,16 +797,25 @@ Creating an additional `AsyncStreamReader` layer would be redundant abstraction.
 
 ## Session Planning
 
-**Recommended session breakdown:**
+**Recommended session breakdown with incremental conformance testing:**
 
 1. **Session 1**: Tasks 1-3 (ASGI Event Primitives)
 2. **Session 2**: Tasks 4-5 (Connect Protocol Async I/O)  
 3. **Session 3**: Tasks 6-8 (Unary RPC Implementation)
-4. **Session 4**: Tasks 9-11 (ConnectASGI Main Class) - **Milestone: Working Unary RPCs**
-5. **Session 5**: Tasks 12-14 (Streaming Foundation)
-6. **Session 6**: Tasks 15-17 (All Streaming Types) - **Milestone: Full-duplex Streaming**
-7. **Session 7**: Tasks 18-19 (Code Generation)
-8. **Session 8**: Tasks 20-21 (Testing & Validation)
-9. **Session 9**: Tasks 22-23 (Production Readiness)
+4. **Session 4**: Tasks 9, 9.5, 10 (ConnectASGI Core + Conformance Infrastructure + Routing) - **Milestone: Working Unary RPCs with Basic Conformance**
+5. **Session 5**: Task 11 (Connection Lifecycle) - **Milestone: Complete Unary Conformance**
+6. **Session 6**: Tasks 12-14 (Streaming Foundation)
+7. **Session 7**: Task 15 (Server Streaming) - **Milestone: Server Streaming Conformance**
+8. **Session 8**: Task 16 (Client Streaming) - **Milestone: Client Streaming Conformance**  
+9. **Session 9**: Task 17 (Bidirectional Streaming) - **Milestone: Full-duplex Streaming Conformance**
+10. **Session 10**: Tasks 18-19 (Code Generation)
+11. **Session 11**: Tasks 20-21 (Testing & Validation - now focused on performance and edge cases)
+12. **Session 12**: Tasks 22-23 (Production Readiness)
 
-Each session should result in working, tested code that brings the implementation closer to full Connect protocol support with ASGI.
+**Key Changes:**
+- **Early Conformance**: Task 9.5 introduces conformance testing infrastructure immediately after basic ASGI implementation
+- **Incremental Validation**: Each streaming milestone includes updating conformance config and validating new RPC types
+- **Continuous Validation**: Conformance tests run throughout development rather than waiting until Task 21
+- **Faster Feedback**: Protocol compliance issues are caught early rather than at the end
+
+Each session should result in working, tested code that passes conformance tests for the implemented features.
