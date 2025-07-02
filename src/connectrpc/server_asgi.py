@@ -6,6 +6,7 @@ application interface for handling Connect protocol RPCs asynchronously.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable
 from collections.abc import Callable
 from typing import Any
@@ -55,13 +56,20 @@ class ConnectASGI:
         app.register_unary_rpc("/service.Method", handler, RequestType)
     """
 
-    def __init__(self) -> None:
-        """Initialize a new ConnectASGI server."""
+    def __init__(self, logger: logging.Logger | None = None) -> None:
+        """Initialize a new ConnectASGI server.
+
+        Args:
+            logger: Optional logger instance. If None, creates a default logger.
+        """
         # RPC registration storage, mirroring ConnectWSGI structure
         self.rpc_types: dict[str, RPCType] = {}
         self.unary_rpcs: dict[str, AsyncUnaryRPC[Message, Message]] = {}
         # Note: Other RPC type storage will be added in later tasks
         self.rpc_input_types: dict[str, type[Message]] = {}
+
+        # Logging setup
+        self._logger = logger or logging.getLogger("connectrpc.server_asgi")
 
     def register_unary_rpc(
         self, path: str, fn: AsyncUnaryRPC[Any, Any], input_type: type[Message]
