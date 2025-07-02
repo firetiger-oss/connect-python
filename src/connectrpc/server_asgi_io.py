@@ -40,10 +40,13 @@ class AsyncRequestBodyReader:
 
         Args:
             receive: ASGI receive callable for getting http.request events
-            content_length: Optional content-length header value for validation
+            content_length: Optional content-length header value for validation.
+                           If 0 or None, content-length validation is disabled.
         """
         self._receive = receive
-        self._content_length = content_length
+        # Treat 0 as unspecified (same as None) since some servers may set content-length: 0
+        # when the actual length is unknown
+        self._content_length = content_length if content_length and content_length > 0 else None
         self._buffer = bytearray()
         self._eof = False
         self._bytes_read = 0

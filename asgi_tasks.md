@@ -139,31 +139,18 @@ ASGI Server → ConnectASGI → Connect Protocol Processing → User Handlers
 
 ---
 
-### Task 5: Connect Protocol Async I/O - StreamReader Adaptation
+### Task 5: Connect Protocol Async I/O - StreamReader Adaptation (**SKIPPED**)
 
-**Description**: Adapt the existing `StreamReader` class to work with ASGI receive events instead of WSGI file-like objects.
+**Status**: **SKIPPED** - Redundant with existing `AsyncRequestBodyReader`
 
-**Context**: The current `StreamReader` (`src/connectrpc/io.py`) works with sync file-like objects. We need an async version that reads from ASGI receive events while maintaining the same interface for compatibility with existing Connect protocol logic.
-
-**Deliverables**:
-- `AsyncStreamReader` class in `src/connectrpc/connect_async_io.py`
-- Async versions of key methods: `readexactly(n)`, `readall()`, `read_envelope()`
-- Integration with `AsyncRequestBodyReader` from Task 1
-- Maintains compatibility with existing compression and Connect protocol processing
+**Reason**: The `AsyncRequestBodyReader` class (Task 1) already provides the needed functionality:
+- Handles ASGI receive events with `read_exactly(n)` and `read_all()` methods  
 - Proper EOF handling and connection lifecycle management
+- Integration ready for Connect protocol processing
 
-**Success Criteria ("Done")**:
-- Unit tests pass for stream reading scenarios:
-  - Reading exact byte counts with `readexactly()`
-  - Reading all available data with `readall()`
-  - Proper EOF detection and handling
-  - Integration with compression/decompression
-- Compatibility test: Existing Connect protocol validation works with `AsyncStreamReader`
-- Integration test: Can read Connect protocol messages from real ASGI requests
+Creating an additional `AsyncStreamReader` layer would be redundant abstraction. Later tasks should use `AsyncRequestBodyReader` directly instead of referencing a non-existent `AsyncStreamReader`.
 
-**Files to Create/Modify**:
-- `src/connectrpc/connect_async_io.py` (extend)
-- Tests: `tests/test_connect_async_io.py` (extend)
+**Impact on Later Tasks**: References to `AsyncStreamReader` in subsequent tasks should be replaced with `AsyncRequestBodyReader`.
 
 ---
 
@@ -726,6 +713,45 @@ ASGI Server → ConnectASGI → Connect Protocol Processing → User Handlers
 - `src/connectrpc/io.py` (modify StreamReader)
 - `src/connectrpc/server_requests.py` (update ConnectUnaryRequest)
 - Tests: Update existing tests as needed
+
+---
+
+### Task 25: Synchronous Envelope Parser for WSGI and Client Use
+
+**Description**: Port the AsyncEnvelopeParser implementation to create a synchronous version for use in WSGI servers and Connect clients.
+
+**Context**: The AsyncEnvelopeParser implemented in Task 4 (commit ccc7bad) provides a clean, well-tested envelope parsing implementation for Connect protocol streaming. This same logic should be available for synchronous use cases:
+1. WSGI streaming requests (to replace the current inline parsing in `ClientStream.from_client_req`)
+2. Connect client streaming responses (currently handled inline in client code)
+3. Consistency between async and sync implementations
+
+**Reference Implementation**: See `AsyncEnvelopeParser` in `src/connectrpc/connect_async_io.py` (commit ccc7bad)
+
+**Deliverables**:
+- `SyncEnvelopeParser` class in `src/connectrpc/connect_sync_io.py` (new file)
+- Same interface as `AsyncEnvelopeParser` but works with sync `Stream` objects from `src/connectrpc/io.py`
+- `EnvelopeData` class can be shared between async and sync implementations
+- Integration with existing `StreamReader` class for reading envelope data
+- Proper error handling matching the async implementation
+- Support for all compression codecs
+
+**Success Criteria ("Done")**:
+- Unit tests pass for sync envelope parsing scenarios:
+  - All test cases from `AsyncEnvelopeParser` ported to sync version
+  - Compressed and uncompressed envelopes work correctly
+  - End-stream detection and error handling
+  - Integration with existing `StreamReader` and compression systems
+- Integration test: Can parse envelopes from existing WSGI streaming requests
+- Refactoring opportunity: Replace inline parsing in `ClientStream.from_client_req` with new parser
+- Architecture consistency: Sync and async envelope parsing have identical behavior
+
+**Files to Create/Modify**:
+- `src/connectrpc/connect_sync_io.py` (new)
+- Tests: `tests/test_connect_sync_io.py` (new)
+- Optional: Refactor `src/connectrpc/server.py` to use new parser
+- Optional: Refactor client streaming code to use new parser
+
+**Dependencies**: Should be completed after Task 24 (WSGI Compression Architecture Cleanup) to ensure consistent compression handling across sync and async implementations.
 
 ---
 
