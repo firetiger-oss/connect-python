@@ -195,10 +195,25 @@ class ConnectASGI:
             await self._send_connect_error_response(error, response)
 
     async def _send_connect_error_response(
-        self, error: ConnectError, response: ASGIResponse
+        self,
+        error: ConnectError,
+        response: ASGIResponse,
+        custom_headers: CIMultiDict[str] | None = None,
+        custom_trailers: CIMultiDict[str] | None = None,
     ) -> None:
         """Send a standard Connect error response."""
         headers = [(b"content-type", b"application/json")]
+
+        # Add custom headers if provided
+        if custom_headers is not None:
+            for k, v in custom_headers.items():
+                headers.append((k.lower().encode(), v.encode()))
+
+        # Add custom trailers as headers with "trailer-" prefix
+        if custom_trailers is not None:
+            for k, v in custom_trailers.items():
+                headers.append((f"trailer-{k.lower()}".encode(), v.encode()))
+
         error_body = error.to_json().encode("utf-8")
 
         await response.send_start(error.http_status, headers)
@@ -255,8 +270,10 @@ class ConnectASGI:
             response: ASGIResponse for sending responses
         """
         if server_resp.error is not None:
-            # Send error response
-            await self._send_connect_error_response(server_resp.error, response)
+            # Send error response with headers and trailers
+            await self._send_connect_error_response(
+                server_resp.error, response, server_resp.headers, server_resp.trailers
+            )
             return
 
         if server_resp.msg is None:

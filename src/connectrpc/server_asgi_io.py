@@ -5,6 +5,7 @@ ConnectRPC servers.
 
 """
 
+from collections.abc import Iterable
 from typing import Any
 
 from asgiref.typing import ASGIReceiveCallable
@@ -374,7 +375,7 @@ class ASGIScope:
         except ValueError:
             self.content_length = 0
 
-    def _normalize_headers(self, headers: list[list[bytes]]) -> CIMultiDict[str]:
+    def _normalize_headers(self, headers: Iterable[tuple[bytes, bytes]]) -> CIMultiDict[str]:
         """
         Normalize ASGI headers to case-insensitive multidict.
 
@@ -391,9 +392,6 @@ class ASGIScope:
         normalized = CIMultiDict[str]()
 
         for header_pair in headers:
-            if len(header_pair) != 2:
-                continue  # Skip malformed headers
-
             name_bytes, value_bytes = header_pair
 
             # Decode bytes to strings, handling potential encoding issues
@@ -425,7 +423,7 @@ class ASGIScope:
         """
         server = self._scope.get("server")
         if server is not None:
-            return tuple(server)
+            return (str(server[0]), server[1])
         return None
 
     def get_client(self) -> tuple[str, int] | None:
@@ -436,7 +434,7 @@ class ASGIScope:
         """
         client = self._scope.get("client")
         if client is not None:
-            return tuple(client)
+            return (str(client[0]), int(client[1]))
         return None
 
     def get_header(self, name: str, default: str | None = None) -> str | None:
