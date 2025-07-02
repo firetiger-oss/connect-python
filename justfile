@@ -34,6 +34,7 @@ protoc-gen *ARGS:
 generate:
     cd tests/conformance && buf generate
     cd examples && buf generate
+    cd tests && buf generate --path testing_service.proto
 
 # Run conformance tests
 conformance-test: conformance-test-client-async conformance-test-client-sync conformance-test-server-sync
