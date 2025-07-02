@@ -254,12 +254,13 @@ Creating an additional `AsyncStreamReader` layer would be redundant abstraction.
 - Basic routing based on HTTP method and path
 - Connection type detection (HTTP vs WebSocket - reject WebSocket)
 - Integration with request processing from Tasks 6-8
+- Do NOT attempt to fully implement the routing layer or RPC calls, just the
+  basic infrastructure of RPC registration and lookup.
 
 **Success Criteria ("Done")**:
 - Unit tests pass for core functionality:
   - ASGI app interface compliance
   - HTTP connection handling (reject WebSocket connections)
-  - Basic routing and method dispatch
   - RPC registration and lookup
 - Integration test: Can be deployed with real ASGI servers (uvicorn, hypercorn)
 - Smoke test: Simple unary RPC works end-to-end

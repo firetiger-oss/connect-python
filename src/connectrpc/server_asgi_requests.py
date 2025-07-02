@@ -24,9 +24,9 @@ from .connect_serialization import ConnectSerialization
 from .errors import BareHTTPError
 from .errors import ConnectError
 from .errors import ConnectErrorCode
+from .server_asgi_io import ASGIResponse
 from .server_asgi_io import ASGIScope
 from .server_asgi_io import AsyncRequestBodyReader
-from .server_asgi_io import AsyncResponseSender
 from .timeouts import ConnectTimeout
 
 if TYPE_CHECKING:
@@ -121,7 +121,7 @@ class AsyncConnectRequest:
         headers = [(k.encode(), v.encode()) for k, v in error.headers.items()]
 
         # Send response
-        sender = AsyncResponseSender(send)
+        sender = ASGIResponse(send)
         await sender.send_start(status_code, headers)
         await sender.send_body(error.body, more_body=False)
 
@@ -352,6 +352,6 @@ class AsyncConnectUnaryRequest(AsyncConnectRequest):
         error_body = error.to_json().encode("utf-8")
 
         # Send response
-        sender = AsyncResponseSender(send)
+        sender = ASGIResponse(send)
         await sender.send_start(status_code, headers)
         await sender.send_body(error_body, more_body=False)

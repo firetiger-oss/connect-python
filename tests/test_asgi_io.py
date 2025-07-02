@@ -10,9 +10,9 @@ import pytest
 from multidict import CIMultiDict
 
 from connectrpc.errors import ConnectError
+from connectrpc.server_asgi_io import ASGIResponse
 from connectrpc.server_asgi_io import ASGIScope
 from connectrpc.server_asgi_io import AsyncRequestBodyReader
-from connectrpc.server_asgi_io import AsyncResponseSender
 
 
 class MockASGIReceive:
@@ -308,14 +308,14 @@ class MockASGISend:
         self.events.append(event)
 
 
-class TestAsyncResponseSender:
-    """Test cases for AsyncResponseSender."""
+class TestASGIResponse:
+    """Test cases for ASGIResponse."""
 
     @pytest.mark.asyncio
     async def test_simple_response_start_and_body(self):
         """Test sending a simple response with start and single body."""
         send = MockASGISend()
-        sender = AsyncResponseSender(send)
+        sender = ASGIResponse(send)
 
         # Send start
         await sender.send_start(200, [(b"content-type", b"text/plain")])
@@ -340,10 +340,10 @@ class TestAsyncResponseSender:
 
     @pytest.mark.asyncio
     async def test_async_context_manager_basic(self):
-        """Test using AsyncResponseSender as async context manager."""
+        """Test using ASGIResponse as async context manager."""
         send = MockASGISend()
 
-        async with AsyncResponseSender(send) as sender:
+        async with ASGIResponse(send) as sender:
             await sender.send_start(200, [(b"content-type", b"text/plain")])
             await sender.send_body(b"Hello, world!")  # more_body=True by default
 
@@ -364,7 +364,7 @@ class TestAsyncResponseSender:
         """Test async context manager with trailers."""
         send = MockASGISend()
 
-        async with AsyncResponseSender(send) as sender:
+        async with ASGIResponse(send) as sender:
             await sender.send_start(200, [], trailers=True)
             await sender.send_body(b"content")  # more_body=True by default
             # Don't manually finish - let context manager handle trailers
@@ -730,8 +730,8 @@ class TestASGIScope:
                 request_body = await body_reader.read_all()
                 test_results["request_body"] = request_body
 
-                # Test 3: AsyncResponseSender sends the response
-                response_sender = AsyncResponseSender(send)
+                # Test 3: ASGIResponse sends the response
+                response_sender = ASGIResponse(send)
 
                 # Send response headers
                 await response_sender.send_start(
@@ -834,7 +834,7 @@ class TestASGIScope:
             assert received_body is not None
             assert received_body == request_data
 
-            # Test 3: Verify AsyncResponseSender sent response correctly
+            # Test 3: Verify ASGIResponse sent response correctly
             assert test_results["response_sent"] is True
             assert b'"received_body_length": 30' in response_body  # len(request_data) = 30
 

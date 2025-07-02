@@ -154,7 +154,7 @@ class AsyncRequestBodyReader:
         return data
 
 
-class AsyncResponseSender:
+class ASGIResponse:
     """Async response sender that implements ASGI response protocol.
 
     ASGI responses require sending `http.response.start` event followed by
@@ -321,7 +321,7 @@ class AsyncResponseSender:
             # No trailers promised, mark as closed
             self._closed = True
 
-    async def __aenter__(self) -> "AsyncResponseSender":
+    async def __aenter__(self) -> "ASGIResponse":
         """Async context manager entry."""
         return self
 
