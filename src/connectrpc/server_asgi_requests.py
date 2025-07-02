@@ -8,6 +8,7 @@ ConnectRPC requests, including validation, decompression, and response handling.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from typing import TypeVar
 
 from asgiref.typing import ASGIReceiveCallable
 from asgiref.typing import ASGISendCallable
@@ -31,6 +32,8 @@ from .timeouts import ConnectTimeout
 
 if TYPE_CHECKING:
     pass
+
+TAsyncConnectRequest = TypeVar("TAsyncConnectRequest", bound="AsyncConnectRequest")
 
 
 class AsyncConnectRequest:
@@ -68,11 +71,11 @@ class AsyncConnectRequest:
 
     @classmethod
     async def from_asgi(
-        cls,
+        cls: type[TAsyncConnectRequest],
         scope: HTTPScope,
         receive: ASGIReceiveCallable,
         send: ASGISendCallable,
-    ) -> AsyncConnectRequest | None:
+    ) -> TAsyncConnectRequest | None:
         """Create an async Connect request from ASGI scope, receive, and send.
 
         This method handles validation of the request and returns None if the
