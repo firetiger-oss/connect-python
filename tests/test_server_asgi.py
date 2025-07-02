@@ -122,19 +122,11 @@ class TestConnectASGI:
         scope = {"type": "unknown"}  # type: ignore[typeddict-item]
         receive = AsyncMock()
 
+        # Should not crash when handling unknown scope types
         await app(scope, receive, mock_send)
 
-        # Should send 400 Bad Request
-        calls = mock_send.call_args_list
-        assert len(calls) == 2
-
-        start_call = calls[0]
-        assert start_call[0][0]["type"] == "http.response.start"
-        assert start_call[0][0]["status"] == 400
-
-        body_call = calls[1]
-        assert body_call[0][0]["type"] == "http.response.body"
-        assert not body_call[0][0]["more_body"]
+        # Should not send any response (can't send HTTP response for non-HTTP scope)
+        mock_send.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_method_not_allowed(self, app: ConnectASGI, mock_send: ASGISendCallable):

@@ -7,6 +7,7 @@ ConnectRPC requests, including validation, decompression, and response handling.
 
 from __future__ import annotations
 
+import struct
 from typing import TYPE_CHECKING
 from typing import TypeVar
 
@@ -28,6 +29,7 @@ from .errors import ConnectErrorCode
 from .server_asgi_io import ASGIResponse
 from .server_asgi_io import ASGIScope
 from .server_asgi_io import AsyncRequestBodyReader
+from .streams_connect import EndStreamResponse
 from .timeouts import ConnectTimeout
 
 if TYPE_CHECKING:
@@ -358,3 +360,163 @@ class AsyncConnectUnaryRequest(AsyncConnectRequest):
         sender = ASGIResponse(send)
         await sender.send_start(status_code, headers)
         await sender.send_body(error_body, more_body=False)
+
+
+class AsyncConnectStreamingRequest(AsyncConnectRequest):
+    """Async Connect streaming request with envelope-based message processing.
+
+    This class handles streaming RPC requests in the ASGI environment, including
+    client streaming and bidirectional streaming requests. Unlike unary requests,
+    streaming requests use the Connect envelope protocol for message framing.
+
+    Streaming requests use different content types and headers compared to unary:
+    - Content-Type: application/connect+json or application/connect+proto
+    - Compression: connect-content-encoding header (per-message compression)
+    """
+
+    def __init__(
+        self,
+        scope: ASGIScope,
+        receive: ASGIReceiveCallable,
+        send: ASGISendCallable,
+        compression: CompressionCodec,
+        serialization: ConnectSerialization,
+        timeout: ConnectTimeout,
+    ):
+        # Initialize base class but then replace send with response sender
+        super().__init__(scope, receive, send, compression, serialization, timeout)
+
+        # For streaming requests, body reader is used for envelope parsing
+        # (no decompression at the body level - it's done per envelope)
+
+        # Create ASGI response sender for streaming requests and remove raw send callback
+        self.response = ASGIResponse(send)
+        # Remove the send callback since we use response sender
+        del self.send
+
+    @staticmethod
+    def validate_compression(scope: ASGIScope) -> CompressionCodec:
+        """Validate connect-content-encoding header for streaming requests.
+
+        Streaming requests use connect-content-encoding instead of content-encoding
+        because compression is applied per-message within envelopes.
+
+        Args:
+            scope: ASGI scope containing request metadata
+
+        Returns:
+            CompressionCodec instance
+
+        Raises:
+            ConnectError: If compression is unsupported
+        """
+        stream_message_encoding = scope.headers.get("connect-content-encoding", "identity")
+        if not supported_compression(stream_message_encoding):
+            err_msg = f"connect-content-encoding {stream_message_encoding} is not supported. Supported values are {supported_compressions()}"
+            raise ConnectError(ConnectErrorCode.UNIMPLEMENTED, err_msg)
+        return load_compression(stream_message_encoding)
+
+    @staticmethod
+    def validate_content_type(scope: ASGIScope) -> ConnectSerialization:
+        """Validate content-type header for streaming requests.
+
+        Streaming requests must use application/connect+json or application/connect+proto
+        content types to distinguish them from unary requests.
+
+        Args:
+            scope: ASGI scope containing request metadata
+
+        Returns:
+            ConnectSerialization instance
+
+        Raises:
+            BareHTTPError: If content type is unsupported (415 response)
+            ConnectError: If content type is a valid connect streaming type but unsupported
+        """
+        if not scope.content_type.startswith("application/connect+"):
+            headers: CIMultiDict[str] = CIMultiDict()
+            headers.add("Accept-Post", "application/connect+json, application/connect+proto")
+            body = b""  # 415 responses typically have empty body
+            raise BareHTTPError("415 Unsupported Media Type", headers, body)
+
+        if scope.content_type == "application/connect+proto":
+            return CONNECT_PROTOBUF_SERIALIZATION
+        elif scope.content_type == "application/connect+json":
+            return CONNECT_JSON_SERIALIZATION
+        else:
+            raise ConnectError(
+                ConnectErrorCode.UNIMPLEMENTED,
+                f"{scope.content_type} codec not implemented; only application/connect+proto and application/connect+json are supported",
+            )
+
+    @classmethod
+    async def _handle_connect_error(
+        cls, error: ConnectError, send: ASGISendCallable, content_type: str
+    ) -> None:
+        """Handle ConnectError for streaming requests.
+
+        Per Connect spec: streaming responses always have HTTP 200 OK.
+        Errors are sent as EndStreamResponse with envelope flag 2.
+        """
+        # Always return 200 OK for streaming responses
+        status_code = 200
+
+        # Use the request's content-type for the response
+        if content_type.startswith("application/connect+"):
+            response_content_type = content_type
+        else:
+            # Default to JSON if content-type was invalid
+            response_content_type = "application/connect+json"
+
+        headers = [
+            (b"content-type", response_content_type.encode()),
+        ]
+
+        # Send error as EndStreamResponse envelope
+        end_stream_response = EndStreamResponse(error, CIMultiDict())
+
+        # EndStreamResponse is always serialized as JSON regardless of content type
+        data = end_stream_response.to_json()
+
+        # Create envelope: flag 2 (EndStreamResponse) + 4-byte length + data
+        envelope = struct.pack(">BI", 2, len(data)) + data
+
+        # Send response
+        sender = ASGIResponse(send)
+        await sender.send_start(status_code, headers)
+        await sender.send_body(envelope, more_body=False)
+
+    async def send_connect_error(self, error: ConnectError) -> None:
+        """Send a ConnectError response using the instance's response sender.
+
+        This method can be used after the request instance is created to send
+        streaming error responses.
+
+        Args:
+            error: The ConnectError to send
+        """
+        # Always return 200 OK for streaming responses; this is
+        # mandated by the connect spec, weird though it may appear.
+        status_code = 200
+
+        # Use the request's content-type for the response
+        if self.content_type.startswith("application/connect+"):
+            response_content_type = self.content_type
+        else:
+            response_content_type = "application/connect+json"
+
+        headers = [
+            (b"content-type", response_content_type.encode()),
+        ]
+
+        await self.response.send_start(status_code, headers)
+
+        # Send error as EndStreamResponse envelope
+        end_stream_response = EndStreamResponse(error, CIMultiDict())
+
+        data = end_stream_response.to_json()
+
+        # Create envelope: flag 2 (EndStreamResponse) + 4-byte length + data
+        envelope = struct.pack(">BI", 2, len(data)) + data
+
+        await self.response.send_body(envelope, more_body=False)

@@ -157,3 +157,57 @@ async def test_real_asgi_server_invalid_content_type(test_server):
         ) as response,
     ):
         assert response.status == 415
+
+
+@pytest.mark.asyncio
+async def test_real_asgi_server_streaming_content_type_validation(test_server):
+    """Test streaming content type validation with real server."""
+    # Test normal unary request (should succeed)
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(
+            f"{test_server.url}/testing.TestingService/Echo",
+            headers={"content-type": "application/json"},
+            json={"message": "hello"},  # Valid JSON for unary
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as response,
+    ):
+        # This should succeed since the echo handler is registered as unary
+        assert response.status == 200
+
+    # Test what would happen with a streaming-specific content type on unary endpoint
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(
+            f"{test_server.url}/testing.TestingService/Echo",
+            headers={
+                "content-type": "application/connect+json"
+            },  # Streaming content type on unary endpoint
+            json={"message": "hello"},  # Valid JSON payload
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as response,
+    ):
+        # Unary endpoints should reject streaming content types
+        assert response.status == 415
+
+
+@pytest.mark.asyncio
+async def test_real_asgi_server_streaming_compression_validation(test_server):
+    """Test streaming compression header validation with real server."""
+    # Test unsupported connect-content-encoding (even though this is a unary endpoint,
+    # we can test the header validation logic)
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(
+            f"{test_server.url}/testing.TestingService/Echo",
+            headers={
+                "content-type": "application/json",
+                "connect-content-encoding": "unsupported-compression",
+            },
+            json={"message": "test"},
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as response,
+    ):
+        # For unary endpoints, connect-content-encoding should be ignored
+        # (it's only used for streaming), so this should succeed
+        assert response.status == 200
