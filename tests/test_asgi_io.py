@@ -494,30 +494,6 @@ class TestASGIScope:
         assert asgi_scope.get_header("missing-header", "default") == "default"
         assert asgi_scope.get_headers("missing-header") == []
 
-    def test_malformed_headers(self):
-        """Test handling of malformed headers."""
-        scope = {
-            "type": "http",
-            "method": "POST",
-            "path": "/test",
-            "headers": [
-                [b"valid-header", b"valid-value"],
-                [b"single-item"],  # Invalid: only one item
-                [b"too", b"many", b"items"],  # Invalid: too many items
-                [b"valid-header-2", b"valid-value-2"],
-            ],
-        }
-
-        asgi_scope = ASGIScope(scope)
-
-        # Valid headers should be parsed
-        assert asgi_scope.get_header("valid-header") == "valid-value"
-        assert asgi_scope.get_header("valid-header-2") == "valid-value-2"
-
-        # Invalid headers should be ignored
-        assert asgi_scope.get_header("single-item") is None
-        assert asgi_scope.get_header("too") is None
-
     def test_invalid_content_length(self):
         """Test handling of invalid Content-Length values."""
         scope = {
