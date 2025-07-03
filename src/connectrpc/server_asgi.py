@@ -7,6 +7,7 @@ application interface for handling Connect protocol RPCs asynchronously.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from collections.abc import Awaitable
 from collections.abc import Callable
 from typing import Any
@@ -29,6 +30,7 @@ from .server import ClientRequest
 from .server import ServerResponse
 from .server_asgi_io import ASGIResponse
 from .server_asgi_requests import AsyncConnectUnaryRequest
+from .server_asgi_streams import AsyncStreamingResponseSender
 from .server_rpc_types import RPCType
 
 T = TypeVar("T", bound=Message)
@@ -37,7 +39,7 @@ U = TypeVar("U", bound=Message)
 # Type aliases for async RPC handlers
 
 AsyncUnaryRPC = Callable[[ClientRequest[T]], Awaitable[ServerResponse[U]]]
-# Note: Streaming RPC types will be added in later tasks
+AsyncServerStreamingRPC = Callable[[ClientRequest[T]], AsyncIterator[U]]
 
 
 class ConnectASGI:
@@ -66,7 +68,8 @@ class ConnectASGI:
         # RPC registration storage, mirroring ConnectWSGI structure
         self.rpc_types: dict[str, RPCType] = {}
         self.unary_rpcs: dict[str, AsyncUnaryRPC[Message, Message]] = {}
-        # Note: Other RPC type storage will be added in later tasks
+        self.server_streaming_rpcs: dict[str, AsyncServerStreamingRPC[Message, Message]] = {}
+        # Note: Client streaming and bidirectional streaming storage will be added in later tasks
         self.rpc_input_types: dict[str, type[Message]] = {}
 
         # Logging setup
@@ -86,9 +89,22 @@ class ConnectASGI:
         self.unary_rpcs[path] = fn
         self.rpc_input_types[path] = input_type
 
+    def register_server_streaming_rpc(
+        self, path: str, fn: AsyncServerStreamingRPC[Any, Any], input_type: type[Message]
+    ) -> None:
+        """Register a server streaming RPC handler.
+
+        Args:
+            path: RPC path (e.g., "/service.Service/Method")
+            fn: Async handler function that returns AsyncIterator[Message]
+            input_type: Protobuf message type for requests
+        """
+        self.rpc_types[path] = RPCType.SERVER_STREAMING
+        self.server_streaming_rpcs[path] = fn
+        self.rpc_input_types[path] = input_type
+
     # Note: Other registration methods will be added in later tasks:
     # - register_client_streaming_rpc()
-    # - register_server_streaming_rpc()
     # - register_bidi_streaming_rpc()
 
     async def __call__(
@@ -104,7 +120,6 @@ class ConnectASGI:
             receive: ASGI receive callable for reading request body
             send: ASGI send callable for sending responses
         """
-        # Handle non-HTTP scope types first
         if scope["type"] == "websocket":
             await self._reject_websocket(scope, receive, send)
             return
@@ -124,7 +139,6 @@ class ConnectASGI:
             # Cast to HTTP scope for type checking
             http_scope: HTTPScope = scope
 
-            # Validate HTTP method - only POST is supported
             method = http_scope["method"]
             if method != "POST":
                 self._logger.debug(f"Method not allowed: {method} (only POST supported)")
@@ -133,7 +147,6 @@ class ConnectASGI:
                 )
                 return
 
-            # Route the request based on path
             path = http_scope["path"]
             rpc_type = self.rpc_types.get(path)
             if rpc_type is None:
@@ -141,14 +154,14 @@ class ConnectASGI:
                 await self._send_error_response(404, "Not Found", b"", response)
                 return
 
-            # Log successful RPC routing
             self._logger.debug(f"Routing {method} {path} to {rpc_type.name} RPC")
 
             # Dispatch to appropriate RPC handler
             if rpc_type == RPCType.UNARY:
                 await self._handle_unary_rpc(http_scope, receive, response)
+            elif rpc_type == RPCType.SERVER_STREAMING:
+                await self._handle_server_streaming_rpc(http_scope, receive, response)
             else:
-                # Streaming RPCs will be implemented in later tasks
                 self._logger.warning(f"Streaming RPC not yet implemented: {rpc_type}")
                 await self._send_error_response(
                     501, "Not Implemented", b"Streaming RPCs not yet implemented", response
@@ -157,17 +170,25 @@ class ConnectASGI:
         except ConnectError as err:
             # Handle Connect protocol errors
             self._logger.info(f"Connect protocol error: {err.code.name} - {err.message}")
-            await self._handle_connect_error(err, response, rpc_type or RPCType.UNARY)
+            if not response.started:
+                await self._handle_connect_error(err, response, rpc_type or RPCType.UNARY)
+            else:
+                self._logger.debug(
+                    "Error occurred after streaming response started - handled by response sender"
+                )
         except ConnectionError as err:
-            # Handle connection errors (disconnect, timeout, etc.)
             self._logger.info(f"Connection error: {err}")
             # Don't try to send response on connection error - connection is likely dead
             raise
         except Exception as err:
-            # Handle unexpected errors
             self._logger.error(f"Unexpected error processing request: {err}", exc_info=True)
-            connect_err = ConnectError(ConnectErrorCode.INTERNAL, str(err))
-            await self._handle_connect_error(connect_err, response, rpc_type or RPCType.UNARY)
+            if not response.started:
+                connect_err = ConnectError(ConnectErrorCode.INTERNAL, str(err))
+                await self._handle_connect_error(connect_err, response, rpc_type or RPCType.UNARY)
+            else:
+                self._logger.debug(
+                    "Error occurred after streaming response started - handled by response sender"
+                )
 
     async def _reject_websocket(
         self, scope: WebSocketScope, receive: ASGIReceiveCallable, send: ASGISendCallable
@@ -370,6 +391,76 @@ class ConnectASGI:
         # Send response
         await response.send_start(200, headers)
         await response.send_body(response_data, more_body=False)
+
+    async def _handle_server_streaming_rpc(
+        self, scope: HTTPScope, receive: ASGIReceiveCallable, response: ASGIResponse
+    ) -> None:
+        """Handle a server streaming RPC request.
+
+        Server streaming RPCs receive a single request message and return a stream
+        of response messages. This combines unary request processing with streaming
+        response handling.
+
+        Args:
+            scope: HTTP scope containing request metadata
+            receive: ASGI receive callable for reading request body
+            response: ASGIResponse for sending responses
+        """
+        path = scope["path"]
+
+        connect_req = await AsyncConnectUnaryRequest.from_asgi(scope, receive, response._send)
+        if connect_req is None:
+            return
+
+        body_data = await connect_req.read_body()
+        msg = connect_req.serialization.deserialize(
+            body_data, self.rpc_input_types[connect_req.path]
+        )
+
+        trailers: CIMultiDict[str] = CIMultiDict()
+        for k, v in connect_req.headers.items():
+            if k.startswith("trailer-"):
+                trailers.add(k, v)
+
+        client_req = ClientRequest(msg, connect_req.headers, trailers, connect_req.timeout)
+
+        self._logger.debug(f"Calling server streaming RPC handler for {path}")
+        response_iterator = self.server_streaming_rpcs[connect_req.path](client_req)
+
+        await self._send_server_streaming_response(response_iterator, connect_req, response)
+        self._logger.debug(f"Successfully completed server streaming RPC for {path}")
+
+    async def _send_server_streaming_response(
+        self,
+        response_iterator: AsyncIterator[Message],
+        connect_req: AsyncConnectUnaryRequest,
+        response: ASGIResponse,
+    ) -> None:
+        """Send a server streaming RPC response.
+
+        Args:
+            response_iterator: AsyncIterator of response messages from handler
+            connect_req: Original Connect request (for serialization context)
+            response: ASGIResponse for sending responses
+        """
+        content_type = connect_req.serialization.streaming_content_type
+
+        headers = [
+            (b"content-type", content_type.encode()),
+            (b"connect-content-encoding", connect_req.compression.label.encode()),
+        ]
+
+        response_sender: AsyncStreamingResponseSender[Message] = AsyncStreamingResponseSender(
+            response=response,
+            serialization=connect_req.serialization,
+            compression_codec=connect_req.compression,
+        )
+
+        await response_sender.send_stream(
+            message_iterator=response_iterator,
+            headers=headers,
+            trailers=None,
+        )
 
 
 # Type alias for ASGI applications

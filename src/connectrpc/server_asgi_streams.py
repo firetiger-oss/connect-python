@@ -31,7 +31,6 @@ if TYPE_CHECKING:
     pass
 
 T = TypeVar("T", bound=Message)
-U = TypeVar("U", bound=Message)
 
 
 class AsyncClientStream(Generic[T]):
@@ -144,7 +143,7 @@ class AsyncClientStream(Generic[T]):
         return message
 
 
-class AsyncStreamingResponseSender(Generic[U]):
+class AsyncStreamingResponseSender(Generic[T]):
     """Handles sending streaming responses via ASGI events using Connect envelope protocol.
 
     This class takes an async iterator from user handlers and sends the messages via ASGI
@@ -161,7 +160,6 @@ class AsyncStreamingResponseSender(Generic[U]):
         response: ASGIResponse,
         serialization: ConnectSerialization,
         compression_codec: CompressionCodec,
-        msg_type: type[U],
     ):
         """Initialize the streaming response sender.
 
@@ -174,13 +172,12 @@ class AsyncStreamingResponseSender(Generic[U]):
         self._response = response
         self._serialization = serialization
         self._compression_codec = compression_codec
-        self._msg_type = msg_type
         self._started = False
         self._finished = False
 
     async def send_stream(
         self,
-        message_iterator: AsyncIterator[U],
+        message_iterator: AsyncIterator[T],
         headers: list[tuple[bytes, bytes]],
         trailers: CIMultiDict[str] | None = None,
     ) -> None:
@@ -219,7 +216,7 @@ class AsyncStreamingResponseSender(Generic[U]):
         finally:
             self._finished = True
 
-    async def _send_message_envelope(self, message: U, is_end_stream: bool) -> None:
+    async def _send_message_envelope(self, message: T, is_end_stream: bool) -> None:
         """Send a single message in Connect envelope format.
 
         Args:

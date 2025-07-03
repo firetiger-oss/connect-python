@@ -186,6 +186,11 @@ class ASGIResponse:
         self._trailers_promised = False
         self._trailers_sent = False
 
+    @property
+    def started(self) -> bool:
+        """Check if the response has been started."""
+        return self._started
+
     async def send_start(
         self, status: int, headers: list[tuple[bytes, bytes]], trailers: bool = False
     ) -> None:

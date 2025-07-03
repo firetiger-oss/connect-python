@@ -440,7 +440,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         # Create a simple async iterator
@@ -489,7 +488,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         # Create async iterator with multiple messages
@@ -531,7 +529,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         # Create empty async iterator
@@ -560,7 +557,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         # Create async iterator that raises an error
@@ -605,7 +601,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         async def simple_stream():
@@ -643,7 +638,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         async def simple_stream():
@@ -670,7 +664,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         # Create stream with many messages
@@ -708,7 +701,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         # Simulate a realistic server streaming scenario
@@ -793,7 +785,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         # Simulate bidirectional streaming where responses are generated
@@ -850,7 +841,6 @@ class TestAsyncStreamingResponseSender:
             response=response,
             serialization=CONNECT_PROTOBUF_SERIALIZATION,
             compression_codec=IdentityCodec,
-            msg_type=StringValue,
         )
 
         # Generate a large number of messages
