@@ -13,6 +13,7 @@ features:
     - COMPRESSION_BR
   stream_types:
     - STREAM_TYPE_UNARY
+    - STREAM_TYPE_SERVER_STREAM
   supports_half_duplex_bidi_over_http1: false
   supports_h2c: false
   supports_tls: true

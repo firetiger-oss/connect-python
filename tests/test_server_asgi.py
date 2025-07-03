@@ -452,9 +452,25 @@ class TestConnectASGIServerStreaming:
         path = "/testing.TestingService/EchoStream"
         app.register_server_streaming_rpc(path, empty_stream_handler, EchoRequest)
 
-        # Create request
-        request_body = json.dumps({"message": "test"}).encode()
-        scope = self.create_http_scope(path=path)
+        # Create request using Connect envelope format (server streaming uses streaming request format)
+        from connectrpc.connect_serialization import CONNECT_JSON_SERIALIZATION
+
+        test_msg = EchoRequest(message="test")
+        serialized_data = CONNECT_JSON_SERIALIZATION.serialize(test_msg)
+
+        # Create Connect envelope: [1 byte flags][4 bytes big-endian length][data]
+        envelope_header = struct.pack(
+            ">BI", 0, len(serialized_data)
+        )  # flags=0 (no compression, not end-stream)
+        message_envelope = envelope_header + serialized_data
+
+        # Create end-stream envelope
+        end_stream_data = b'{"metadata":{}}'
+        end_envelope_header = struct.pack(">BI", 2, len(end_stream_data))  # flags=2 (end-stream)
+        end_stream_envelope = end_envelope_header + end_stream_data
+
+        request_body = message_envelope + end_stream_envelope
+        scope = self.create_http_scope(path=path, content_type="application/connect+json")
         receive = self.create_receive_with_body(request_body)
 
         await app(scope, receive, mock_send)
@@ -490,9 +506,25 @@ class TestConnectASGIServerStreaming:
         path = "/testing.TestingService/EchoStream"
         app.register_server_streaming_rpc(path, single_message_handler, EchoRequest)
 
-        # Create request
-        request_body = json.dumps({"message": "hello"}).encode()
-        scope = self.create_http_scope(path=path)
+        # Create request using Connect envelope format (server streaming uses streaming request format)
+        from connectrpc.connect_serialization import CONNECT_JSON_SERIALIZATION
+
+        test_msg = EchoRequest(message="hello")
+        serialized_data = CONNECT_JSON_SERIALIZATION.serialize(test_msg)
+
+        # Create Connect envelope: [1 byte flags][4 bytes big-endian length][data]
+        envelope_header = struct.pack(
+            ">BI", 0, len(serialized_data)
+        )  # flags=0 (no compression, not end-stream)
+        message_envelope = envelope_header + serialized_data
+
+        # Create end-stream envelope
+        end_stream_data = b'{"metadata":{}}'
+        end_envelope_header = struct.pack(">BI", 2, len(end_stream_data))  # flags=2 (end-stream)
+        end_stream_envelope = end_envelope_header + end_stream_data
+
+        request_body = message_envelope + end_stream_envelope
+        scope = self.create_http_scope(path=path, content_type="application/connect+json")
         receive = self.create_receive_with_body(request_body)
 
         await app(scope, receive, mock_send)
@@ -532,9 +564,25 @@ class TestConnectASGIServerStreaming:
         path = "/testing.TestingService/EchoStream"
         app.register_server_streaming_rpc(path, multi_message_handler, EchoRequest)
 
-        # Create request
-        request_body = json.dumps({"message": "hello"}).encode()
-        scope = self.create_http_scope(path=path)
+        # Create request using Connect envelope format (server streaming uses streaming request format)
+        from connectrpc.connect_serialization import CONNECT_JSON_SERIALIZATION
+
+        test_msg = EchoRequest(message="hello")
+        serialized_data = CONNECT_JSON_SERIALIZATION.serialize(test_msg)
+
+        # Create Connect envelope: [1 byte flags][4 bytes big-endian length][data]
+        envelope_header = struct.pack(
+            ">BI", 0, len(serialized_data)
+        )  # flags=0 (no compression, not end-stream)
+        message_envelope = envelope_header + serialized_data
+
+        # Create end-stream envelope
+        end_stream_data = b'{"metadata":{}}'
+        end_envelope_header = struct.pack(">BI", 2, len(end_stream_data))  # flags=2 (end-stream)
+        end_stream_envelope = end_envelope_header + end_stream_data
+
+        request_body = message_envelope + end_stream_envelope
+        scope = self.create_http_scope(path=path, content_type="application/connect+json")
         receive = self.create_receive_with_body(request_body)
 
         await app(scope, receive, mock_send)
@@ -572,9 +620,25 @@ class TestConnectASGIServerStreaming:
         path = "/testing.TestingService/EchoStream"
         app.register_server_streaming_rpc(path, failing_handler, EchoRequest)
 
-        # Create request
-        request_body = json.dumps({"message": "test"}).encode()
-        scope = self.create_http_scope(path=path)
+        # Create request using Connect envelope format (server streaming uses streaming request format)
+        from connectrpc.connect_serialization import CONNECT_JSON_SERIALIZATION
+
+        test_msg = EchoRequest(message="test")
+        serialized_data = CONNECT_JSON_SERIALIZATION.serialize(test_msg)
+
+        # Create Connect envelope: [1 byte flags][4 bytes big-endian length][data]
+        envelope_header = struct.pack(
+            ">BI", 0, len(serialized_data)
+        )  # flags=0 (no compression, not end-stream)
+        message_envelope = envelope_header + serialized_data
+
+        # Create end-stream envelope
+        end_stream_data = b'{"metadata":{}}'
+        end_envelope_header = struct.pack(">BI", 2, len(end_stream_data))  # flags=2 (end-stream)
+        end_stream_envelope = end_envelope_header + end_stream_data
+
+        request_body = message_envelope + end_stream_envelope
+        scope = self.create_http_scope(path=path, content_type="application/connect+json")
         receive = self.create_receive_with_body(request_body)
 
         await app(scope, receive, mock_send)
@@ -644,9 +708,25 @@ class TestConnectASGIServerStreaming:
         path = "/testing.TestingService/EchoStream"
         app.register_server_streaming_rpc(path, envelope_test_handler, EchoRequest)
 
-        # Create request
-        request_body = json.dumps({"message": "test"}).encode()
-        scope = self.create_http_scope(path=path)
+        # Create request using Connect envelope format (server streaming uses streaming request format)
+        from connectrpc.connect_serialization import CONNECT_JSON_SERIALIZATION
+
+        test_msg = EchoRequest(message="test")
+        serialized_data = CONNECT_JSON_SERIALIZATION.serialize(test_msg)
+
+        # Create Connect envelope: [1 byte flags][4 bytes big-endian length][data]
+        envelope_header = struct.pack(
+            ">BI", 0, len(serialized_data)
+        )  # flags=0 (no compression, not end-stream)
+        message_envelope = envelope_header + serialized_data
+
+        # Create end-stream envelope
+        end_stream_data = b'{"metadata":{}}'
+        end_envelope_header = struct.pack(">BI", 2, len(end_stream_data))  # flags=2 (end-stream)
+        end_stream_envelope = end_envelope_header + end_stream_data
+
+        request_body = message_envelope + end_stream_envelope
+        scope = self.create_http_scope(path=path, content_type="application/connect+json")
         receive = self.create_receive_with_body(request_body)
 
         await app(scope, receive, mock_send)

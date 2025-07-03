@@ -3,6 +3,7 @@ from __future__ import annotations
 import socket
 import sys
 import tempfile
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 from typing import Any
 
@@ -50,7 +51,11 @@ def asgi_conformance_service(implementation: ConformanceServiceProtocol) -> ASGI
     app.register_unary_rpc(
         "/connectrpc.conformance.v1.ConformanceService/Unary", implementation.unary, UnaryRequest
     )
-    # Note: For now only unary RPCs are supported, streaming will be added later
+    app.register_server_streaming_rpc(
+        "/connectrpc.conformance.v1.ConformanceService/ServerStream",
+        implementation.server_stream,
+        ServerStreamRequest,
+    )
     app.register_unary_rpc(
         "/connectrpc.conformance.v1.ConformanceService/Unimplemented",
         implementation.unimplemented,
@@ -73,7 +78,7 @@ class ConformanceServiceProtocol:
 
     async def server_stream(
         self, req: ClientRequest[ServerStreamRequest]
-    ) -> ServerStream[ServerStreamResponse]:
+    ) -> AsyncIterator[ServerStreamResponse]:
         """Async server streaming RPC handler."""
         ...
 
@@ -146,11 +151,41 @@ class Conformance:
 
     async def server_stream(
         self, req: ClientRequest[ServerStreamRequest]
-    ) -> ServerStream[ServerStreamResponse]:
-        # Note: This will be implemented when server streaming is added to ConnectASGI
-        raise ConnectError(
-            ConnectErrorCode.UNIMPLEMENTED, "server streaming not yet implemented in ASGI"
+    ) -> AsyncIterator[ServerStreamResponse]:
+        # Capture the request - same logic as WSGI version but async
+        req_msg_any = ProtoAny()
+        req_msg_any.Pack(req.msg)
+        req_info = ConformancePayload.RequestInfo(
+            request_headers=multidict_to_proto(req.headers),
+            timeout_ms=req.timeout.timeout_ms,
+            requests=[req_msg_any],
         )
+
+        response_defn = req.msg.response_definition
+
+        n_sent = 0
+        for resp_data in response_defn.response_data:
+            output_msg = ServerStreamResponse(payload=ConformancePayload(data=resp_data))
+            if n_sent == 0:
+                output_msg.payload.request_info.CopyFrom(req_info)
+
+            if response_defn.response_delay_ms > 0:
+                import asyncio
+
+                await asyncio.sleep(response_defn.response_delay_ms / 1000.0)
+
+            yield output_msg
+            n_sent += 1
+
+        if response_defn.HasField("error"):
+            err_proto = response_defn.error
+            err = proto_to_exception(err_proto)
+            if n_sent == 0:
+                # If we sent no responses, but are supposed to
+                # send an error, then we need to stuff req_info
+                # into the error details of the error.
+                err.add_detail(req_info)
+            raise err
 
     async def client_stream(
         self, req: ClientStream[ClientStreamRequest]

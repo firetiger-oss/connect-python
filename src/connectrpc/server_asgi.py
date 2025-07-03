@@ -29,7 +29,9 @@ from .errors import ConnectErrorCode
 from .server import ClientRequest
 from .server import ServerResponse
 from .server_asgi_io import ASGIResponse
+from .server_asgi_requests import AsyncConnectStreamingRequest
 from .server_asgi_requests import AsyncConnectUnaryRequest
+from .server_asgi_streams import AsyncClientStream
 from .server_asgi_streams import AsyncStreamingResponseSender
 from .server_rpc_types import RPCType
 
@@ -397,9 +399,9 @@ class ConnectASGI:
     ) -> None:
         """Handle a server streaming RPC request.
 
-        Server streaming RPCs receive a single request message and return a stream
-        of response messages. This combines unary request processing with streaming
-        response handling.
+        Server streaming RPCs receive a single request message in streaming format and return a stream
+        of response messages. This follows the same pattern as WSGI: use streaming request processing
+        but extract the single message to create a ClientRequest for the handler.
 
         Args:
             scope: HTTP scope containing request metadata
@@ -408,21 +410,48 @@ class ConnectASGI:
         """
         path = scope["path"]
 
-        connect_req = await AsyncConnectUnaryRequest.from_asgi(scope, receive, response._send)
+        # Use streaming request (not unary) since server streaming uses envelope format
+        connect_req = await AsyncConnectStreamingRequest.from_asgi(scope, receive, response._send)
         if connect_req is None:
             return
 
-        body_data = await connect_req.read_body()
-        msg = connect_req.serialization.deserialize(
-            body_data, self.rpc_input_types[connect_req.path]
+        msg_type = self.rpc_input_types[connect_req.path]
+
+        # The client sends the request as a stream with just one message
+        client_stream = await AsyncClientStream.from_asgi_request(
+            body_reader=connect_req._body_reader,
+            serialization=connect_req.serialization,
+            compression_codec=connect_req.compression,
+            msg_type=msg_type,
+            headers=connect_req.headers,
+            timeout=connect_req.timeout,
         )
 
-        trailers: CIMultiDict[str] = CIMultiDict()
-        for k, v in connect_req.headers.items():
-            if k.startswith("trailer-"):
-                trailers.add(k, v)
+        # Read exactly one message from the client stream
+        last_msg: Message | None = None
+        message_count = 0
+        try:
+            async for msg in client_stream:
+                last_msg = msg
+                message_count += 1
+                if message_count > 1:
+                    raise ConnectError(
+                        ConnectErrorCode.UNIMPLEMENTED,
+                        "server-streaming endpoint received more than one message from client",
+                    )
+        except StopAsyncIteration:
+            pass
 
-        client_req = ClientRequest(msg, connect_req.headers, trailers, connect_req.timeout)
+        if last_msg is None:
+            raise ConnectError(
+                ConnectErrorCode.UNIMPLEMENTED,
+                "server-streaming endpoint received no message from client",
+            )
+
+        # Create ClientRequest from the single message (same as WSGI pattern)
+        client_req = ClientRequest(
+            last_msg, client_stream.headers, CIMultiDict(), client_stream.timeout
+        )
 
         self._logger.debug(f"Calling server streaming RPC handler for {path}")
         response_iterator = self.server_streaming_rpcs[connect_req.path](client_req)
@@ -433,14 +462,14 @@ class ConnectASGI:
     async def _send_server_streaming_response(
         self,
         response_iterator: AsyncIterator[Message],
-        connect_req: AsyncConnectUnaryRequest,
+        connect_req: AsyncConnectStreamingRequest,
         response: ASGIResponse,
     ) -> None:
         """Send a server streaming RPC response.
 
         Args:
             response_iterator: AsyncIterator of response messages from handler
-            connect_req: Original Connect request (for serialization context)
+            connect_req: Original Connect streaming request (for serialization context)
             response: ASGIResponse for sending responses
         """
         content_type = connect_req.serialization.streaming_content_type

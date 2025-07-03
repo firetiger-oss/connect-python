@@ -111,7 +111,7 @@ conformance-test-server-async *ARGS:
     cd tests/conformance
 
     connectconformance \
-        --conf ./asgi_unary_config.yaml \
+        --conf ./asgi_server_config.yaml \
         --mode server \
         {{ARGS}} \
         -- \
