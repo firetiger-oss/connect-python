@@ -36,6 +36,7 @@ from connectrpc.server import ClientStream
 from connectrpc.server import ServerResponse
 from connectrpc.server import ServerStream
 from connectrpc.server_asgi import ConnectASGI
+from connectrpc.server_asgi_streams import AsyncClientStream
 
 if TYPE_CHECKING:
     from asgiref.typing import ASGIApplication
@@ -55,6 +56,11 @@ def asgi_conformance_service(implementation: ConformanceServiceProtocol) -> ASGI
         "/connectrpc.conformance.v1.ConformanceService/ServerStream",
         implementation.server_stream,
         ServerStreamRequest,
+    )
+    app.register_client_streaming_rpc(
+        "/connectrpc.conformance.v1.ConformanceService/ClientStream",
+        implementation.client_stream,
+        ClientStreamRequest,
     )
     app.register_unary_rpc(
         "/connectrpc.conformance.v1.ConformanceService/Unimplemented",
@@ -83,7 +89,7 @@ class ConformanceServiceProtocol:
         ...
 
     async def client_stream(
-        self, req: ClientStream[ClientStreamRequest]
+        self, req: AsyncClientStream[ClientStreamRequest]
     ) -> ServerResponse[ClientStreamResponse]:
         """Async client streaming RPC handler."""
         ...
@@ -188,12 +194,67 @@ class Conformance:
             raise err
 
     async def client_stream(
-        self, req: ClientStream[ClientStreamRequest]
+        self, req: AsyncClientStream[ClientStreamRequest]
     ) -> ServerResponse[ClientStreamResponse]:
-        # Note: This will be implemented when client streaming is added to ConnectASGI
-        raise ConnectError(
-            ConnectErrorCode.UNIMPLEMENTED, "client streaming not yet implemented in ASGI"
+        """Async client streaming RPC handler - adapted from WSGI version."""
+        received: list[ProtoAny] = []
+
+        response: ServerResponse[ClientStreamResponse] = ServerResponse.empty()
+
+        response_defn = None
+        first_msg = True
+
+        # Async iteration over the client stream
+        async for msg in req:
+            msg_as_any = ProtoAny()
+            msg_as_any.Pack(msg)
+            received.append(msg_as_any)
+
+            if first_msg:
+                first_msg = False
+                if msg.response_definition is not None:
+                    response_defn = msg.response_definition
+                    for h in response_defn.response_headers:
+                        for value in h.value:
+                            response.headers.add(h.name, value)
+                    for t in response_defn.response_trailers:
+                        for value in t.value:
+                            response.trailers.add(t.name, value)
+
+        req_info = ConformancePayload.RequestInfo(
+            request_headers=multidict_to_proto(req.headers),
+            timeout_ms=req.timeout.timeout_ms,
+            requests=received,
         )
+
+        if response_defn is None:
+            # No response definition provided
+            error = ConnectError(
+                ConnectErrorCode.INVALID_ARGUMENT, "No response definition provided"
+            )
+            response.error = error
+            return response
+
+        if response_defn.response_delay_ms > 0:
+            import asyncio
+
+            await asyncio.sleep(response_defn.response_delay_ms / 1000.0)
+
+        if response_defn.HasField("error"):
+            assert response_defn.error is not None
+            err_proto = response_defn.error
+            err = proto_to_exception(err_proto)
+            err.add_detail(req_info)
+            response.error = err
+            return response
+
+        response.msg = ClientStreamResponse(
+            payload=ConformancePayload(
+                request_info=req_info,
+                data=response_defn.response_data,
+            ),
+        )
+        return response
 
     async def bidi_stream(
         self, req: ClientStream[BidiStreamRequest]

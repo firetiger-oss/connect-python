@@ -19,6 +19,7 @@ from connectrpc.errors import ConnectErrorCode
 from connectrpc.server import ClientRequest
 from connectrpc.server import ServerResponse
 from connectrpc.server_asgi import ConnectASGI
+from connectrpc.server_asgi_streams import AsyncClientStream
 from connectrpc.server_rpc_types import RPCType
 from tests.testing.testing_service_pb2 import EchoRequest
 from tests.testing.testing_service_pb2 import EchoResponse
@@ -88,10 +89,12 @@ class TestConnectASGI:
         assert isinstance(app.rpc_types, dict)
         assert isinstance(app.unary_rpcs, dict)
         assert isinstance(app.server_streaming_rpcs, dict)
+        assert isinstance(app.client_streaming_rpcs, dict)
         assert isinstance(app.rpc_input_types, dict)
         assert len(app.rpc_types) == 0
         assert len(app.unary_rpcs) == 0
         assert len(app.server_streaming_rpcs) == 0
+        assert len(app.client_streaming_rpcs) == 0
         assert len(app.rpc_input_types) == 0
 
     def test_register_unary_rpc(self, app: ConnectASGI):
@@ -123,6 +126,27 @@ class TestConnectASGI:
 
         assert app.rpc_types[path] == RPCType.SERVER_STREAMING
         assert app.server_streaming_rpcs[path] == test_handler
+        assert app.rpc_input_types[path] == EchoRequest
+
+    def test_register_client_streaming_rpc(self, app: ConnectASGI):
+        """Test registering a client streaming RPC."""
+
+        async def test_handler(req: AsyncClientStream[EchoRequest]) -> ServerResponse[EchoResponse]:
+            message_count = 0
+            last_message = ""
+            async for message in req:
+                message_count += 1
+                last_message = message.message
+
+            response = EchoResponse()
+            response.message = f"received {message_count} messages, last: {last_message}"
+            return ServerResponse(response)
+
+        path = "/testing.TestingService/EchoClientStream"
+        app.register_client_streaming_rpc(path, test_handler, EchoRequest)
+
+        assert app.rpc_types[path] == RPCType.CLIENT_STREAMING
+        assert app.client_streaming_rpcs[path] == test_handler
         assert app.rpc_input_types[path] == EchoRequest
 
     @pytest.mark.asyncio
@@ -187,13 +211,13 @@ class TestConnectASGI:
         assert start_call[0][0]["status"] == 404
 
     @pytest.mark.asyncio
-    async def test_client_and_bidi_streaming_not_implemented(
+    async def test_bidi_streaming_not_implemented(
         self, app: ConnectASGI, mock_send: ASGISendCallable
     ):
-        """Test that client streaming and bidirectional streaming RPCs return 501 Not Implemented."""
-        # Test client streaming not implemented
-        path = "/test.Service/ClientStreamingMethod"
-        app.rpc_types[path] = RPCType.CLIENT_STREAMING
+        """Test that bidirectional streaming RPCs return 501 Not Implemented."""
+        # Test bidirectional streaming not implemented
+        path = "/test.Service/BidiStreamingMethod"
+        app.rpc_types[path] = RPCType.BIDI_STREAMING
 
         scope = self.create_http_scope(path=path)
         receive = AsyncMock()
@@ -751,6 +775,348 @@ class TestConnectASGIServerStreaming:
                         json.loads(data.decode())
                     except (json.JSONDecodeError, UnicodeDecodeError):
                         pytest.fail("End-stream envelope should contain valid JSON")
+
+
+class TestConnectASGIClientStreaming:
+    """Test suite for ConnectASGI client streaming functionality."""
+
+    def create_http_scope(
+        self,
+        method: str = "POST",
+        path: str = "/test.Service/Method",
+        headers: list[list[bytes]] | None = None,
+        content_type: str = "application/connect+json",
+    ) -> HTTPScope:
+        """Create a test HTTP scope."""
+        if headers is None:
+            headers = [[b"content-type", content_type.encode()]]
+
+        return {
+            "type": "http",
+            "method": method,
+            "path": path,
+            "headers": headers,
+            "query_string": b"",
+            "root_path": "",
+            "scheme": "http",
+            "server": ("127.0.0.1", 8000),
+        }
+
+    def create_receive_with_body(self, body: bytes) -> ASGIReceiveCallable:
+        """Create a mock receive callable that returns the given body."""
+
+        async def receive() -> HTTPRequestEvent:
+            return {
+                "type": "http.request",
+                "body": body,
+                "more_body": False,
+            }
+
+        return receive
+
+    def create_streaming_request_body(self, messages: list[EchoRequest]) -> bytes:
+        """Create streaming request body with multiple messages in Connect envelope format."""
+        from connectrpc.connect_serialization import CONNECT_JSON_SERIALIZATION
+
+        request_body = b""
+
+        # Add each message as an envelope
+        for message in messages:
+            serialized_data = CONNECT_JSON_SERIALIZATION.serialize(message)
+            envelope_header = struct.pack(
+                ">BI", 0, len(serialized_data)
+            )  # flags=0 (no compression, not end-stream)
+            message_envelope = envelope_header + serialized_data
+            request_body += message_envelope
+
+        # Add end-stream envelope
+        end_stream_data = b'{"metadata":{}}'
+        end_envelope_header = struct.pack(">BI", 2, len(end_stream_data))  # flags=2 (end-stream)
+        end_stream_envelope = end_envelope_header + end_stream_data
+        request_body += end_stream_envelope
+
+        return request_body
+
+    @pytest.fixture
+    def mock_send(self) -> ASGISendCallable:
+        """Create a mock send callable that records calls."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def app(self) -> ConnectASGI:
+        """Create a test ConnectASGI server."""
+        return ConnectASGI()
+
+    @pytest.mark.asyncio
+    async def test_successful_client_streaming_single_message(
+        self, app: ConnectASGI, mock_send: ASGISendCallable
+    ):
+        """Test client streaming RPC that receives single message."""
+
+        async def single_message_handler(
+            req: AsyncClientStream[EchoRequest],
+        ) -> ServerResponse[EchoResponse]:
+            message_count = 0
+            last_message = ""
+            async for message in req:
+                message_count += 1
+                last_message = message.message
+
+            response = EchoResponse()
+            response.message = f"received {message_count} messages, last: {last_message}"
+            return ServerResponse(response)
+
+        path = "/testing.TestingService/EchoClientStream"
+        app.register_client_streaming_rpc(path, single_message_handler, EchoRequest)
+
+        # Create request with single message
+        messages = [EchoRequest(message="hello")]
+        request_body = self.create_streaming_request_body(messages)
+        scope = self.create_http_scope(path=path)
+        receive = self.create_receive_with_body(request_body)
+
+        await app(scope, receive, mock_send)
+
+        # Check response
+        calls = mock_send.call_args_list
+        assert len(calls) >= 2  # start + response message + end-stream
+
+        # Check start response
+        start_call = calls[0]
+        assert start_call[0][0]["type"] == "http.response.start"
+        assert start_call[0][0]["status"] == 200
+
+        # Check content-type header (should be streaming JSON)
+        headers = start_call[0][0]["headers"]
+        content_type_header = next((h for h in headers if h[0] == b"content-type"), None)
+        assert content_type_header is not None
+        assert content_type_header[1] == b"application/connect+json"
+
+    @pytest.mark.asyncio
+    async def test_successful_client_streaming_multiple_messages(
+        self, app: ConnectASGI, mock_send: ASGISendCallable
+    ):
+        """Test client streaming RPC that receives multiple messages."""
+
+        async def multi_message_handler(
+            req: AsyncClientStream[EchoRequest],
+        ) -> ServerResponse[EchoResponse]:
+            messages = []
+            async for message in req:
+                messages.append(message.message)
+
+            response = EchoResponse()
+            response.message = f"received {len(messages)} messages: {', '.join(messages)}"
+            return ServerResponse(response)
+
+        path = "/testing.TestingService/EchoClientStream"
+        app.register_client_streaming_rpc(path, multi_message_handler, EchoRequest)
+
+        # Create request with multiple messages
+        messages = [
+            EchoRequest(message="hello"),
+            EchoRequest(message="world"),
+            EchoRequest(message="test"),
+        ]
+        request_body = self.create_streaming_request_body(messages)
+        scope = self.create_http_scope(path=path)
+        receive = self.create_receive_with_body(request_body)
+
+        await app(scope, receive, mock_send)
+
+        # Check response
+        calls = mock_send.call_args_list
+        assert len(calls) >= 2  # start + response message + end-stream
+
+        # Check start response
+        start_call = calls[0]
+        assert start_call[0][0]["type"] == "http.response.start"
+        assert start_call[0][0]["status"] == 200
+
+    @pytest.mark.asyncio
+    async def test_successful_client_streaming_empty_stream(
+        self, app: ConnectASGI, mock_send: ASGISendCallable
+    ):
+        """Test client streaming RPC that receives empty stream."""
+
+        async def empty_stream_handler(
+            req: AsyncClientStream[EchoRequest],
+        ) -> ServerResponse[EchoResponse]:
+            message_count = 0
+            async for _message in req:
+                message_count += 1
+
+            response = EchoResponse()
+            response.message = f"received {message_count} messages"
+            return ServerResponse(response)
+
+        path = "/testing.TestingService/EchoClientStream"
+        app.register_client_streaming_rpc(path, empty_stream_handler, EchoRequest)
+
+        # Create request with no messages (just end-stream)
+        messages: list[EchoRequest] = []
+        request_body = self.create_streaming_request_body(messages)
+        scope = self.create_http_scope(path=path)
+        receive = self.create_receive_with_body(request_body)
+
+        await app(scope, receive, mock_send)
+
+        # Check response
+        calls = mock_send.call_args_list
+        assert len(calls) >= 2  # start + response message + end-stream
+
+        # Check start response
+        start_call = calls[0]
+        assert start_call[0][0]["type"] == "http.response.start"
+        assert start_call[0][0]["status"] == 200
+
+    @pytest.mark.asyncio
+    async def test_client_streaming_handler_error(
+        self, app: ConnectASGI, mock_send: ASGISendCallable
+    ):
+        """Test client streaming RPC where handler returns an error."""
+
+        async def error_handler(
+            req: AsyncClientStream[EchoRequest],
+        ) -> ServerResponse[EchoResponse]:
+            async for message in req:
+                if message.message == "error":
+                    error = ConnectError(ConnectErrorCode.INVALID_ARGUMENT, "Test error")
+                    return ServerResponse(error)
+
+            response = EchoResponse()
+            response.message = "no error"
+            return ServerResponse(response)
+
+        path = "/testing.TestingService/EchoClientStream"
+        app.register_client_streaming_rpc(path, error_handler, EchoRequest)
+
+        # Create request with error-triggering message
+        messages = [EchoRequest(message="error")]
+        request_body = self.create_streaming_request_body(messages)
+        scope = self.create_http_scope(path=path)
+        receive = self.create_receive_with_body(request_body)
+
+        await app(scope, receive, mock_send)
+
+        # Check response
+        calls = mock_send.call_args_list
+        assert len(calls) >= 2  # start + end-stream with error
+
+        # Check start response (streaming errors use HTTP 200)
+        start_call = calls[0]
+        assert start_call[0][0]["type"] == "http.response.start"
+        assert start_call[0][0]["status"] == 200
+
+    @pytest.mark.asyncio
+    async def test_client_streaming_handler_exception(
+        self, app: ConnectASGI, mock_send: ASGISendCallable
+    ):
+        """Test client streaming RPC where handler raises an exception."""
+
+        async def exception_handler(
+            req: AsyncClientStream[EchoRequest],
+        ) -> ServerResponse[EchoResponse]:
+            async for message in req:
+                if message.message == "exception":
+                    raise ValueError("Handler exception")
+
+            response = EchoResponse()
+            response.message = "no exception"
+            return ServerResponse(response)
+
+        path = "/testing.TestingService/EchoClientStream"
+        app.register_client_streaming_rpc(path, exception_handler, EchoRequest)
+
+        # Create request with exception-triggering message
+        messages = [EchoRequest(message="exception")]
+        request_body = self.create_streaming_request_body(messages)
+        scope = self.create_http_scope(path=path)
+        receive = self.create_receive_with_body(request_body)
+
+        await app(scope, receive, mock_send)
+
+        # Check response
+        calls = mock_send.call_args_list
+        assert len(calls) >= 2  # start + error body
+
+        # Check start response (handler exceptions before streaming starts use HTTP 500)
+        start_call = calls[0]
+        assert start_call[0][0]["type"] == "http.response.start"
+        assert start_call[0][0]["status"] == 500  # Internal error
+
+    @pytest.mark.asyncio
+    async def test_client_streaming_invalid_request_validation(
+        self, app: ConnectASGI, mock_send: ASGISendCallable
+    ):
+        """Test client streaming with invalid request validation."""
+
+        async def stream_handler(
+            req: AsyncClientStream[EchoRequest],
+        ) -> ServerResponse[EchoResponse]:
+            response = EchoResponse()
+            response.message = "response"
+            return ServerResponse(response)
+
+        path = "/testing.TestingService/EchoClientStream"
+        app.register_client_streaming_rpc(path, stream_handler, EchoRequest)
+
+        # Create request with invalid content-type (should use application/connect+json for streaming)
+        scope = self.create_http_scope(path=path, content_type="text/plain")
+        receive = self.create_receive_with_body(b"invalid data")
+
+        await app(scope, receive, mock_send)
+
+        # Should get validation error (415 Unsupported Media Type)
+        calls = mock_send.call_args_list
+        assert len(calls) == 2
+
+        start_call = calls[0]
+        assert start_call[0][0]["type"] == "http.response.start"
+        assert start_call[0][0]["status"] == 415
+
+    @pytest.mark.asyncio
+    async def test_client_streaming_with_headers_and_trailers(
+        self, app: ConnectASGI, mock_send: ASGISendCallable
+    ):
+        """Test client streaming RPC with custom headers and trailers."""
+        from multidict import CIMultiDict
+
+        async def header_handler(
+            req: AsyncClientStream[EchoRequest],
+        ) -> ServerResponse[EchoResponse]:
+            message_count = 0
+            async for _message in req:
+                message_count += 1
+
+            headers = CIMultiDict([("X-Custom-Header", "custom-value")])
+            trailers = CIMultiDict([("X-Custom-Trailer", "trailer-value")])
+            response = EchoResponse()
+            response.message = f"received {message_count} messages"
+            return ServerResponse(response, headers=headers, trailers=trailers)
+
+        path = "/testing.TestingService/EchoClientStream"
+        app.register_client_streaming_rpc(path, header_handler, EchoRequest)
+
+        # Create request with single message
+        messages = [EchoRequest(message="test")]
+        request_body = self.create_streaming_request_body(messages)
+        scope = self.create_http_scope(path=path)
+        receive = self.create_receive_with_body(request_body)
+
+        await app(scope, receive, mock_send)
+
+        # Check response headers
+        calls = mock_send.call_args_list
+        assert len(calls) >= 2
+
+        start_call = calls[0]
+        headers = start_call[0][0]["headers"]
+
+        # Check for custom header
+        custom_header = next((h for h in headers if h[0] == b"x-custom-header"), None)
+        assert custom_header is not None
+        assert custom_header[1] == b"custom-value"
 
 
 class TestConnectASGIErrorHandling:
