@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-import socket
+import asyncio
 import sys
 import tempfile
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
-from typing import Any
 
 from google.protobuf.any_pb2 import Any as ProtoAny
+from hypercorn.asyncio import worker_serve
+from hypercorn.config import Config as HypercornConfig
+from hypercorn.config import Sockets
+from hypercorn.utils import wrap_app
 from multidict import CIMultiDict
 
 from conformance import multidict_to_proto
@@ -276,46 +279,16 @@ class Conformance:
 
 
 class ASGIServer:
-    """ASGI server using uvicorn, similar to SocketGunicornApp for WSGI."""
+    """ASGI server using hypercorn, similar to SocketGunicornApp for WSGI."""
 
-    def __init__(self, app: ASGIApplication, sock: socket.socket, extra_config: dict[str, Any]):
+    def __init__(self, app: ASGIApplication, cfg: HypercornConfig, sockets: Sockets):
         self.app = app
-        self.sock = sock
-        self.extra_config = extra_config
-        self.server = None
+        self.cfg = cfg
+        self.sockets = sockets
 
-    def run(self) -> None:
+    async def run(self) -> None:
         """Run the ASGI server."""
-        try:
-            import uvicorn
-        except ImportError as err:
-            raise RuntimeError("uvicorn is required for ASGI conformance server") from err
-
-        host, port = self.sock.getsockname()
-
-        config = uvicorn.Config(
-            self.app, host=host, port=port, log_level="error", access_log=False, **self.extra_config
-        )
-        server = uvicorn.Server(config)
-        self.server = server
-
-        server.run([self.sock])
-
-    def shutdown(self) -> None:
-        """Shutdown the server."""
-        if self.server:
-            self.server.should_exit = True
-
-
-def create_bound_socket() -> tuple[socket.socket, int]:
-    """Create and bind a socket, return socket and port - reuse from WSGI version."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(("0.0.0.0", 0))  # Let OS pick port
-    sock.listen(128)  # Set listen backlog
-
-    port = sock.getsockname()[1]
-    return sock, port
+        await worker_serve(wrap_app(self.app, 1, "asgi"), self.cfg, sockets=self.sockets)
 
 
 def prepare_async(sc_req: ServerCompatRequest) -> tuple[ServerCompatResponse, ASGIServer]:
@@ -324,59 +297,46 @@ def prepare_async(sc_req: ServerCompatRequest) -> tuple[ServerCompatResponse, AS
     Similar to prepare_sync but for ASGI.
     """
     app_impl = Conformance()
-    asgi_app = asgi_conformance_service(app_impl)
-    sock, port = create_bound_socket()
-
-    cfg: dict[str, Any] = {}
+    app = asgi_conformance_service(app_impl)
+    cfg = HypercornConfig()
+    cfg.bind = ['127.0.0.1:0']
     if sc_req.use_tls:
         with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pem") as cert_file:
             cert_file.write(sc_req.server_creds.cert)
-            cfg["ssl_certfile"] = cert_file.name
+            cfg.certfile = cert_file.name
 
         with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pem") as key_file:
             key_file.write(sc_req.server_creds.key)
-            cfg["ssl_keyfile"] = key_file.name
+            cfg.keyfile = key_file.name
 
-    server = ASGIServer(asgi_app, sock, cfg)
+    sockets = cfg.create_sockets()
+    server = ASGIServer(app, cfg, sockets)
 
-    response = ServerCompatResponse(host="127.0.0.1", port=port, pem_cert=sc_req.server_creds.cert)
+    socket = sockets.secure_sockets[0] if sc_req.use_tls else sockets.insecure_sockets[0]
+
+    host, port = socket.getsockname()
+    response = ServerCompatResponse(host=host, port=port, pem_cert=sc_req.server_creds.cert)
     return response, server
 
 
-def main(mode: str) -> None:
+async def main() -> None:
     """Main loop that reads requests from stdin and writes responses to stdout."""
-    if mode not in {"sync", "async"}:
-        raise ValueError("mode must be sync or async")
+    try:
+        message_bytes = read_size_delimited_message()
+        if message_bytes is None:
+            raise ValueError("got empty conformance message")
 
-    while True:
-        try:
-            message_bytes = read_size_delimited_message()
-            if message_bytes is None:
-                break  # EOF
+        request = ServerCompatRequest()
+        request.ParseFromString(message_bytes)
 
-            request = ServerCompatRequest()
-            request.ParseFromString(message_bytes)
+        response, server = prepare_async(request)
+        write_size_delimited_message(response.SerializeToString())
+        await server.run()
 
-            if mode == "sync":
-                from conformance_server import prepare_sync
-
-                response, server = prepare_sync(request)
-                write_size_delimited_message(response.SerializeToString())
-                server.run()
-                return
-            elif mode == "async":
-                response, server = prepare_async(request)
-                write_size_delimited_message(response.SerializeToString())
-                server.run()
-                return
-            else:
-                raise NotImplementedError
-
-        except Exception as e:
-            sys.stderr.write(f"Error processing request: {e}\n")
-            sys.stderr.flush()
-            break
+    except Exception as e:
+        sys.stderr.write(f"Error processing request: {e}\n")
+        sys.stderr.flush()
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    asyncio.run(main())
