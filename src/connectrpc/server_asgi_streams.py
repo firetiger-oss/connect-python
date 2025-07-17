@@ -238,7 +238,7 @@ class AsyncStreamingResponseSender(Generic[T]):
         if self._compression_codec.label != "identity":
             try:
                 compressor = self._compression_codec.compressor()
-                message_data = compressor.compress(message_data)
+                message_data = compressor.compress(message_data) + compressor.flush()
                 envelope_flags |= 0x01  # Set compression flag
             except Exception as e:
                 raise ConnectError(
@@ -274,7 +274,7 @@ class AsyncStreamingResponseSender(Generic[T]):
         if self._compression_codec.label != "identity":
             try:
                 compressor = self._compression_codec.compressor()
-                end_stream_data = compressor.compress(end_stream_data)
+                end_stream_data = compressor.compress(end_stream_data) + compressor.flush()
                 envelope_flags |= 0x01
             except Exception:
                 # Compression failure for end-stream is not critical.
